@@ -8,7 +8,8 @@
  * WordList is a list of word-lists, like [ [c,a,t], [i,t], ... ].
  *********************************************************************/
 puzzle_solution(Puzzle, WordList) :-
-    extract_all_slots(Puzzle, Slots),
+    extract_all_slots(Puzzle, UnorderedSlots),
+    sort_slots_by_prefilled(Puzzle, UnorderedSlots, Slots),
     fill_slots(Slots, Puzzle, WordList).
 
 /*********************************************************************
@@ -64,7 +65,7 @@ collect_runs([Cell|T], Col, Runs) :-
     collect_runs(T, Col1, Runs).
 
 collect_runs([Cell|T], Col, [[Col|MoreCols] | OtherRuns]) :-
-    var(Cell),  % Check if the cell is an open cell
+    Cell \== '#', % Check if the cell is an open cell
     ColPlusOne is Col + 1,
     collect_consecutive(T, ColPlusOne, MoreCols, Remainder),
     length(MoreCols, RunLength),  % Calculate the length of the run
@@ -83,7 +84,7 @@ collect_consecutive([Cell|T], _Col, [], T) :-
     !.
 
 collect_consecutive([Cell|T], Col, [Col|More], Remainder) :-
-    var(Cell),  % Check if the cell is an open cell
+    Cell \== '#', % Check if the cell is an open cell
     Col1 is Col + 1,
     collect_consecutive(T, Col1, More, Remainder).
 
@@ -120,34 +121,78 @@ fix_transposed_coords([slot(horizontal,Len,TransCoords)|T1],
 swap_rc((R,C), (C,R)).
 
 /*********************************************************************
- * fill_slots/3
- * Try to assign each Slot a word from WordList. If none fits, fail.
+ * Sort slots by how many cells are already filled with letters
+ * in the puzzle.  More pre-filled => fill earlier => ensures
+ * partial constraints are satisfied first.
+ *********************************************************************/
+sort_slots_by_prefilled(_Puzzle, [], []).
+sort_slots_by_prefilled(Puzzle, [Slot|Others], SortedSlots) :-
+    slot_prefilled_count(Puzzle, Slot, Count),
+    sort_slots_by_prefilled(Puzzle, Others, Rest),
+    insert_by_count(Slot-Count, Rest, SortedSlots).
+
+/*********************************************************************
+ * slot_prefilled_count/3
+ * Count how many cells in this slot are already a letter (var(Cell) => 0).
+ *********************************************************************/
+slot_prefilled_count(_Puzzle, slot(_Orient, _Len, []), 0) :-
+    writeln('Base case reached: Count = 0').
+
+slot_prefilled_count(Puzzle, slot(Orient, Len, [(R, C) | Coords]), Count) :-
+    nth0(R, Puzzle, Row),
+    nth0(C, Row, Cell),
+    (   var(Cell) -> ThisOne = 0  % Cell is unbound
+    ;   Cell == '#' -> ThisOne = 0  % Cell is a block
+    ;   ThisOne = 1  % Cell is prefilled with a letter
+    ),
+    writeln(['Processing cell:', (R, C), 'Cell:', Cell, 'ThisOne:', ThisOne]),
+    slot_prefilled_count(Puzzle, slot(Orient, Len, Coords), Rest),  % Recursive call
+    writeln(['Rest count:', Rest]),
+    Count is ThisOne + Rest,  % Compute total count
+    writeln(['Total count:', Count]).
+
+/*********************************************************************
+ * insert_by_count/3
+ * Insert Slot-Count into sorted list, so bigger counts come first.
+ *********************************************************************/
+insert_by_count(SC, [], [SC]).
+insert_by_count(Slot-Count, [OtherSlot-OC|Rest], [Slot-Count,OtherSlot-OC|Rest]) :-
+    Count >= OC, !.
+insert_by_count(SC, [X|Rest], [X|NewRest]) :-
+    insert_by_count(SC, Rest, NewRest).
+
+/*********************************************************************
+ * Now we fill the sorted slots from "most prefilled" to "least prefilled".
  *********************************************************************/
 fill_slots([], _Puzzle, _WordList) :-
     writeln('All slots filled successfully.').
 
-fill_slots([Slot|OtherSlots], Puzzle, WordList) :-
+fill_slots([Slot-_|OtherSlots], Puzzle, WordList) :-
+    % ^ note that we store (slot(Orient,Len,Coords) - PrefilledCount)
+    % so we just pick the first part for the actual slot
+    Slot = slot(_,_,_),
     writeln(['Filling slot:', Slot]),
-    try_words_in_slot(Slot, Puzzle, WordList),
-    writeln(['Slot filled:', Slot]),
-    fill_slots(OtherSlots, Puzzle, WordList).
+    select_a_word_and_fill(Slot, Puzzle, WordList, NewWordList),
+    fill_slots(OtherSlots, Puzzle, NewWordList).
 
 /*********************************************************************
- * try_words_in_slot/3
- * Attempt each Word in WordList; if slot_matches_word => unify puzzle.
+ * select_a_word_and_fill/4
+ * We try each Word from WordList, but upon success, remove that Word
+ * for future slots so it can't be reused.
  *********************************************************************/
-try_words_in_slot(Slot, _Puzzle, []) :-
-    writeln(['No more words for slot', Slot]),
-    fail.
-try_words_in_slot(Slot, Puzzle, [Word|Rest]) :-
+select_a_word_and_fill(Slot, Puzzle, [Word|RestWords], Rest) :-
     writeln(['Trying word', Word, 'in slot', Slot]),
     (   slot_matches_word(Puzzle, Slot, Word)
-    ->  writeln(['Success check for', Word]),
+    ->  % If it fits, place it, and *this* Word is consumed
+        writeln(['Success check for', Word]),
         place_word_in_slot(Puzzle, Slot, Word),
-        writeln(['Placed word', Word, 'in slot', Slot])
-    ;   writeln(['Failed check for', Word]), fail
+        writeln(['Placed word', Word, 'in slot', Slot]),
+        Rest = RestWords  % remove Word from the list for future
+    ;   writeln(['Failed check for', Word]),
+        fail
     )
-    ;   try_words_in_slot(Slot, Puzzle, Rest).
+    ;   % If fail, backtrack to try next Word in the list
+        select_a_word_and_fill(Slot, Puzzle, RestWords, Rest).
 
 /*********************************************************************
  * slot_matches_word/3
@@ -195,20 +240,28 @@ place_word_in_slot(Puzzle, slot(Orient, Len, [(R,C)|Coords]), [Letter|Rest]) :-
 
 /*********************************************************************
  * Test Cases using SWI-Prolog's plunit
- * To run the tests, use the command: ?- run_tests.
-    * This will execute all the tests defined below.
  *********************************************************************/
 
 :- begin_tests(puzzle_solution).
 
-% Test Case 1: example given
 test(example,[nondet]) :-
-    Puzzle = [['#', h, '#'], [_, _, _], ['#', _, '#']],
-    WordList = [[h, a, t], [b, a, g]],
+    Puzzle = [
+        ['#', h, '#'], 
+        [ _,  _,  _ ], 
+        ['#', _, '#']
+    ],
+    WordList = [
+        [h, a, t], 
+        [b, a, g]
+    ],
     puzzle_solution(Puzzle, WordList),
-    Puzzle = [['#', h, '#'], ['b', a, 'g'], ['#', t, '#']].
+    ExpectedPuzzle = [
+        ['#', h, '#'], 
+        [ b,  a,  g ], 
+        ['#', t, '#']
+    ],
+    assertion(Puzzle == ExpectedPuzzle).
 
-% Test Case 2: testing small puzzle
 test(small_puzzle,[nondet]) :-
     Puzzle = [
         [ _,  '#', _ ],
@@ -216,17 +269,21 @@ test(small_puzzle,[nondet]) :-
         [ '#', _, '#' ]
     ],
     WordList = [
-        [c,a,t],
-        [b,a,g],
-        [i,t],
-        [i,f],
-        [e,c],
-        [a,r]
+        [c, a, t],
+        [b, a, g],
+        [i, t],
+        [i, f],
+        [e, c],
+        [a, r]
     ],
     puzzle_solution(Puzzle, WordList),
-    Puzzle = [[e, '#', i], [c, a, t], ['#', r, '#']].
+    ExpectedPuzzle = [
+        [ e, '#', i ] , 
+        [ c,  a,  t ], 
+        ['#', r, '#']
+    ],
+    assertion(Puzzle == ExpectedPuzzle).
 
-% Test Case on wikipedia
 test(wikipedia, [nondet]) :-
     Puzzle = [
         ['#', '#', '#',  _ ,  _ ,  _ , '#', '#', '#', '#'],
@@ -268,6 +325,4 @@ test(wikipedia, [nondet]) :-
         ['#', '#', '#',  r ,  e ,  f , '#', '#', '#', '#']
     ]. 
 
-
 :- end_tests(puzzle_solution).
-
