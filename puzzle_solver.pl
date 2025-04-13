@@ -460,17 +460,21 @@ validate_cells(Puzzle, [(R, C) | Tcoords], [Letter | Rest]) :-
  * If a candidate fails, we backtrack and try the next one.
  *********************************************************************/
 try_fill_slot_with_candidates(Puzzle, Slot, OtherSlots, WordDict) :-
+    /* Evaluate candidates for Slot. */
     candidates_for_slot(Puzzle, Slot, WordDict, Candidates),
+    /* If there's at least one Word => place it. */
+    /* If no candidates, fail and backtrack. */
     ( Candidates = [] ->
-        format('❌ No candidates for slot: ~w~n', [Slot]), fail
+        format('No candidates for slot: ~w~n', [Slot]), fail
     ; true ),
+    /* member is non-deterministic => backtrack on failure. */
     member(Word, Candidates),
-    format('✅ Trying word ~w in slot ~w~n', [Word, Slot]),
+    /* Try to place the word in the slot. */
+    format('Trying word ~w in slot ~w~n', [Word, Slot]),
     place_word_in_slot(Puzzle, Slot, Word),
     Slot = slot(_, Len, _),
     remove_word_from_dict(WordDict, Len, Word, WordDict2),
     fill_puzzle(Puzzle, OtherSlots, WordDict2).
-
 
 /*********************************************************************
  * place_word_in_slot/3
@@ -742,6 +746,7 @@ test(fifteen_by_fifteen, [nondet]) :-
         [ _,  _,  _,  _,  _, '#', _,  _, '#', _,  _,  _,  _,  _,  _ ]
     ],
     WordList = [
+        % Horitzontal
         [a, b, c, d, e],
         [f, g, h, i, j, k, l, m, n],
         [o, p, q, r, s],
@@ -780,6 +785,7 @@ test(fifteen_by_fifteen, [nondet]) :-
         [n, o, p, q, r],
         [s, t],
         [u, v, w, x, y, z],
+        % Vertical
         [a, o, b, n, a, o, x, k, x, h, t, g, p, a, n],
         [b, p],
         [o, b, p, y, l, y, i, u, h],
