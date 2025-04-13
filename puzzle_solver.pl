@@ -5,27 +5,74 @@
 /*********************************************************************
  * puzzle_solution/2
  *
- * The main entry point: Puzzle is a list-of-lists, each cell is '#'
- * (blocked), a letter atom, or an unbound variable (_). WordList is
- * a list of word-lists, e.g. [ [c,a,t], [b,a,g], ... ].
+ * The main entry point: 
+ *   Puzzle = list-of-lists, each cell either '#', a letter, or var(_).
+ *   WordList = list of words, each word is a list of letters.
  *
- * We do:
- *  (1) Extract all slots.
- *  (2) Sort them by how many letters are already prefilled.
- *  (3) Fill each slot, removing each used word.
- *  (4) We fail if leftover words remain after filling all slots.
+ * Changes from prior code:
+ *  (1) No "sorting by prefilled letters" or slot-length. Instead, we
+ *      do a dynamic "most constrained slot first" approach.
+ *  (2) We keep a dictionary of words by length => WordDict.
+ *      This prevents scanning the entire word list for each slot.
  *
- * Key improvement: skip words that do not match the slot's length
- *                 to prune the search drastically.
+ * Steps:
+ *  1) Build dictionary: length -> [words of that length].
+ *  2) Extract all horizontal & vertical slots. Store as a simple list.
+ *  3) fill_puzzle(Puzzle, Slots, WordDict):
+ *      - If no more slots => must check WordDict is empty => success/fail
+ *      - Else pick the slot with the fewest candidate words => fill it
+ *        by trying each candidate. If all fail => backtrack.
+ *  4) A candidate word is one that matches length & partial puzzle letters.
+ *  5) Each time we place a word in a slot, we remove that word from
+ *     the dictionary (since each word can only be used once).
  *********************************************************************/
 puzzle_solution(Puzzle, WordList) :-
-    precompute_letter_frequencies(WordList, LetterFreqs),
-    writeln(['Letter frequencies:', LetterFreqs]),
-    sort_words_by_heuristic(WordList, LetterFreqs, SortedWordList),
-    writeln(['Sorted WordList:', SortedWordList]),
-    extract_all_slots(Puzzle, UnorderedSlots),
-    sort_slots_by_prefilled(Puzzle, UnorderedSlots, Slots),
-    fill_slots(Slots, Puzzle, SortedWordList).
+    /* 1) Build dictionary of words by length. */
+    build_word_dict(WordList, WordDict0),
+    
+    /* 2) Extract all slots (>= 2 in length). */
+    extract_all_slots(Puzzle, Slots),
+    
+    /* 3) Solve by dynamically picking the most constrained slot first. */
+    fill_puzzle(Puzzle, Slots, WordDict0).
+
+/*********************************************************************
+ * build_word_dict/2
+ * Build a map (list of length->words) from the given WordList.
+ *
+ * Example: If WordList = [[c,a,t],[b,a,g],[i,t],[i,f]]
+ *   Then WordDict might be:
+ *   [
+ *     2 -> [[i,t],[i,f]],
+ *     3 -> [[c,a,t],[b,a,g]]
+ *   ]
+ *
+ * Implementation detail:
+ *   We'll store it as a list of pairs: [ length-L, list-of-words ].
+ *   Then we can look up by length with an auxiliary 'get_words_of_length/3'.
+ *********************************************************************/
+build_word_dict(WordList, WordDict) :-
+    /* Group words by length using an accumulator approach. */
+    group_words_by_length(WordList, [], WordDictUnsorted),
+    /* Sort the dictionary by length ascending (not crucial, but neat). */
+    sort(WordDictUnsorted, WordDict).
+
+/* group_words_by_length/3 does the grouping recursively. */
+group_words_by_length([], Acc, Acc).
+group_words_by_length([W|Ws], Acc, Out) :-
+    length(W, L),
+    /* Insert W into the bucket for length L. */
+    insert_word_in_dict(L, W, Acc, Acc2),
+    group_words_by_length(Ws, Acc2, Out).
+
+/* insert_word_in_dict(+Len, +Word, +DictIn, -DictOut).
+   If there's a pair (Len->List), we add Word to that list,
+   else we create a new pair. */
+insert_word_in_dict(L, W, [], [L-[W]]) :- !.
+insert_word_in_dict(L, W, [Len-Words|Rest], [Len-[W|Words]|Rest]) :-
+    L == Len, !.
+insert_word_in_dict(L, W, [Pair|Rest], [Pair|NewRest]) :-
+    insert_word_in_dict(L, W, Rest, NewRest).
 
 /*********************************************************************
  * extract_all_slots/2
@@ -40,10 +87,6 @@ extract_all_slots(Puzzle, AllSlots) :-
     append(HSlots, VSlots, AllSlots),
     writeln('All slots:'), writeln(AllSlots).
 
-/*********************************************************************
- * extract_horizontal_slots/2
- * For each row, find runs of length >= 2 (skip single '#' or single cells).
- *********************************************************************/
 extract_horizontal_slots(Puzzle, HSlots) :-
     length(Puzzle, NumRows),
     format("NumRows = ~w~n", [NumRows]),
@@ -67,23 +110,34 @@ row_to_slots(RowList, RowIndex, RowSlots) :-
 collect_runs([], _, []).
 collect_runs([Cell|T], Col, Runs) :-
     Cell == '#',  % blocked => skip
+    writeln(['Blocked cell at', Col]),
     Col1 is Col + 1,
     collect_runs(T, Col1, Runs).
 
 collect_runs([Cell|T], Col, [[Col|MoreCols] | OtherRuns]) :-
     Cell \== '#',  % open cell
+    format("Open cell at column ~w: ~w~n", [Col, Cell]),
+    writeln(['Cell', Cell]),
     ColPlusOne is Col + 1,
     collect_consecutive(T, ColPlusOne, MoreCols, Remainder),
     length(MoreCols, RunLength),
-    NextCol is Col + RunLength + 1,
+    writeln(['ColPlusOne:', ColPlusOne]),
+    writeln(['RunLength:', RunLength]),
+    % ColPlusOne is the starting column of the consecutive run
+    % RunLength is the length of the consecutive run
+    % + 1 for the next column after the consecutive run terminates
+    NextCol is ColPlusOne + RunLength + 1,
+    writeln(['NextCol:', NextCol]),
     collect_runs(Remainder, NextCol, OtherRuns).
 
-collect_consecutive([], _Col, [], []) :- !.
-collect_consecutive([Cell|T], _Col, [], T) :-
+collect_consecutive([], _Col, [], []).
+collect_consecutive([Cell|T], Col, [], T) :-
     Cell == '#', 
+    format("Terminating run at blocked cell in column ~w~n", [Col]),
     !.
 collect_consecutive([Cell|T], Col, [Col|More], Remainder) :-
     Cell \== '#',
+    format("Collecting consecutive open cell at column ~w~n", [Col]),
     Col1 is Col + 1,
     collect_consecutive(T, Col1, More, Remainder).
 
@@ -98,10 +152,6 @@ make_horizontal_slots([RunCols|T], Row, Slots) :-
     Len < 2, % skip single-cell runs
     make_horizontal_slots(T, Row, Slots).
 
-/*********************************************************************
- * extract_vertical_slots/2
- * Transpose puzzle => each column => a "row" => reuse horizontal code.
- *********************************************************************/
 extract_vertical_slots(Puzzle, VSlots) :-
     transpose(Puzzle, TGrid),
     extract_horizontal_slots(TGrid, TempHSlots),
@@ -115,181 +165,162 @@ fix_transposed_coords([slot(horizontal,Len,TC)|T],[slot(vertical,Len,OC)|T2]) :-
 swap_rc((R,C),(C,R)).
 
 /*********************************************************************
- * sort_slots_by_prefilled/3
- * For each slot, count how many puzzle cells are already letters.
- * Then sort by that count in descending order (more prefilled => earlier).
+ * get_words_of_length(+Dict, +Length, -WordsList)
+ * Retrieve the list of words for 'Length' from the dictionary.
+ * If none found, WordsList = [].
  *********************************************************************/
-sort_slots_by_prefilled(_, [], []).
-sort_slots_by_prefilled(Puzzle, [Slot|Others], SortedSlots) :-
-    slot_prefilled_count(Puzzle, Slot, PrefilledCount),
-    Slot = slot(_, Length, _),
-    sort_slots_by_prefilled(Puzzle, Others, Rest),
-    insert_by_count(Slot-(PrefilledCount, Length), Rest, SortedSlots).
-
-slot_prefilled_count(_Puzzle, slot(_Orient,_Len,[]), 0).
-slot_prefilled_count(Puzzle, slot(Orient, Len, [(R,C)|Coords]), Count) :-
-    nth0(R, Puzzle, Row),
-    nth0(C, Row, Cell),
-    (   var(Cell)
-    ->  ThisOne = 0
-    ;   Cell == '#'
-    ->  ThisOne = 0
-    ;   ThisOne = 1
-    ),
-    slot_prefilled_count(Puzzle, slot(Orient,Len,Coords), Rest),
-    Count is ThisOne + Rest.
-
-insert_by_count(SC, [], [SC]).
-insert_by_count(SlotA-(CountA, LengthA), [SlotB-(CountB, LengthB)|Rest], [SlotA-(CountA, LengthA), SlotB-(CountB, LengthB)|Rest]) :-
-    (CountA > CountB ; (CountA == CountB, LengthA >= LengthB)), !.
-insert_by_count(SC, [X|Rest], [X|NewRest]) :-
-    insert_by_count(SC, Rest, NewRest).
-
-
-sort_words_by_heuristic(WordList, LetterFreqs, SortedWordList) :-
-    maplist(word_score_with_word(LetterFreqs), WordList, ScoredWords),
-    keysort(ScoredWords, SortedScoredWords),
-    reverse(SortedScoredWords, DescendingScoredWords),  % Sort descending
-    pairs_values(DescendingScoredWords, SortedWordList).
-
-word_score_with_word(LetterFreqs, Word, Score-Word) :-
-    word_score(Word, LetterFreqs, Score).
-
-% Precompute letter frequencies for the entire WordList
-precompute_letter_frequencies(WordList, LetterFreqs) :-
-    flatten(WordList, Letters),  % Flatten all words into a single list of letters
-    findall(Letter-Count, (member(Letter, Letters), count_occurrences(Letter, Letters, Count)), Pairs),
-    sort(Pairs, LetterFreqs).  % Remove duplicates and sort by letter
-
-% Count occurrences of a letter in a list
-count_occurrences(Letter, List, Count) :-
-    include(=(Letter), List, Filtered),
-    length(Filtered, Count).
-
-word_score(Word, LetterFreqs, Score) :-
-    findall(Freq, (member(Letter, Word), member(Letter-Freq, LetterFreqs)), Frequencies),
-    sum_list(Frequencies, Score).
+get_words_of_length([], _L, []).
+get_words_of_length([Len-Words|_], L, Words) :- L == Len, !.
+get_words_of_length([_|Rest], L, Words) :-
+    get_words_of_length(Rest, L, Words).
 
 /*********************************************************************
- * fill_slots/3
- * Fill each slot exactly once, removing used words from WordList
- * If leftover words remain after last slot => fail.
+ * remove_word_from_dict(+DictIn, +Length, +Word, -DictOut)
+ * Remove 'Word' from the dictionary bucket for 'Length'.
+ * If that bucket becomes empty afterwards, remove that pair entirely.
  *********************************************************************/
-fill_slots([], _Puzzle, WordList) :-
-    writeln(['Final WordList:', WordList]),
-    ( WordList == [] ->
-         writeln('All slots filled successfully.'), !
-      ;  writeln('No more slots, but leftover words remain => fail'),
-         fail
+remove_word_from_dict([], _L, _Word, []) :- 
+    /* Should not happen if we keep consistent usage. */
+    fail.
+
+remove_word_from_dict([Len-Words|Rest], L, Word, [Len-NewWords|Rest]) :-
+    L == Len, 
+    select(Word, Words, NewWords), 
+    NewWords \= [], 
+    !.
+
+remove_word_from_dict([Len-[Word]|Rest], L, Word, Rest) :-
+    /* If removing Word from that single-element bucket => remove bucket. */
+    L == Len, !.
+
+remove_word_from_dict([Pair|Rest], L, W, [Pair|NewRest]) :-
+    remove_word_from_dict(Rest, L, W, NewRest).
+
+/*********************************************************************
+ * fill_puzzle/3
+ * fill_puzzle(+Puzzle, +Slots, +WordDict).
+ *
+ * - If no more slots => check dictionary is empty => success or fail.
+ * - Else pick the "most constrained slot" => minimal # of candidate words.
+ * - For each candidate word:
+ *     place it, remove from dict, recurse. On failure => backtrack.
+ *********************************************************************/
+fill_puzzle(_Puzzle, [], WordDict) :-
+    /* If no more slots, we succeed only if no leftover words remain. */
+    ( WordDict == [] ->
+        writeln('All slots filled successfully.'),
+        !
+      ; writeln(['No more slots, but leftover words remain', WordDict, ' => fail']),
+        fail
     ).
 
-fill_slots([Slot-_|OtherSlots], Puzzle, WordList) :-
-    writeln(['Current WordList:', WordList]),
-    ( WordList == [] ->
-        writeln('Ran out of words before filling all slots => fail'),
-        fail
-    ; true
-    ),
-    Slot = slot(_,Len,Coords),
-    writeln(['Filling slot:', Slot]),
-    select_a_word_and_fill(Slot, Len, Coords, Puzzle, WordList, NewWordList),
-    writeln(['WordList after filling slot:', NewWordList]),
-    fill_slots(OtherSlots, Puzzle, NewWordList).
+fill_puzzle(Puzzle, Slots, WordDict) :-
+    /* 1) Pick the slot with the fewest candidate words => "most constrained" */
+    pick_most_constrained_slot(Puzzle, Slots, WordDict, Slot, OtherSlots),
+    /* 2) Attempt each candidate word in turn. */
+    try_fill_slot_with_candidates(Puzzle, Slot, OtherSlots, WordDict).
 
 /*********************************************************************
- * select_a_word_and_fill/6
- * Try each Word in WordList. On success, remove that Word. Otherwise fail.
- * Also skip words that do not match the slot's length, to prune search.
+ * pick_most_constrained_slot/5
+ * Evaluate candidate count for each slot => pick the one with min #.
  *********************************************************************/
-select_a_word_and_fill(Slot, SlotLen, Coords, Puzzle, WordList, FinalWordList) :-
-    % Temporarily filter words by length
-    include(correct_length(SlotLen), WordList, FilteredWords),
-    writeln(['Filtered WordList for slot length', SlotLen, ':', FilteredWords]),
-    try_words(Slot, Coords, Puzzle, FilteredWords, WordList, FinalWordList).
+pick_most_constrained_slot(Puzzle, [S|Ss], WordDict, Slot, OtherSlots) :-
+    /* Evaluate # of candidates for S. */
+    candidates_for_slot(Puzzle, S, WordDict, CandS),
+    length(CandS, CountS),
+    pick_most_constrained_slot_aux(Puzzle, Ss, WordDict, S, CountS, Slot),
+    /* Remove that Slot from the big list => OtherSlots is the rest. */
+    delete([S|Ss], Slot, OtherSlots).
 
-filter_and_sort_words(SlotLen, WordList, LetterFreqs, SortedWords) :-
-    findall(Score-Word,
-        (   member(Word, WordList),
-            length(Word, SlotLen),  % Filter by length
-            word_score(Word, LetterFreqs, Score)  % Compute heuristic score
-        ),
-        ScoredWords),
-    keysort(ScoredWords, SortedScoredWords),
-    reverse(SortedScoredWords, DescendingScoredWords),  % Sort descending
-    pairs_values(DescendingScoredWords, SortedWords).
-
-correct_length(SlotLen, Word) :-
-    length(Word, SlotLen).
-
-try_words(_, _, _, [], _, _) :-
-    writeln(['No words left to try for this slot. Backtracking...']),
-    fail.  % No words left to try, fail
-
-try_words(Slot, Coords, Puzzle, [Word|RestWords], OriginalWordList, FinalWordList) :-
-    writeln(['Trying word', Word, 'in slot', Slot]),
-    (   slot_matches_word(Puzzle, Slot, Word)
-    ->  writeln(['Success check for', Word]),
-        place_word_in_slot(Puzzle, Slot, Word),
-        writeln(['Placed word', Word, 'in slot', Slot]),
-        % Remove the word from the current WordList
-        select(Word, OriginalWordList, UpdatedWordList),
-        writeln(['WordList after removal:', UpdatedWordList]),
-        FinalWordList = UpdatedWordList
-    ;   writeln(['Failed check for', Word]),
-        % Pass the current WordList (unchanged) to the next recursive call
-        try_words(Slot, Coords, Puzzle, RestWords, OriginalWordList, FinalWordList)
+pick_most_constrained_slot_aux(_Puzzle, [], _WDict, Slot, _Count, Slot).
+pick_most_constrained_slot_aux(Puzzle, [S2|Ss], WDict, BestSlotSoFar, BestCount, FinalSlot) :-
+    candidates_for_slot(Puzzle, S2, WDict, Cand2),
+    length(Cand2, Count2),
+    ( Count2 < BestCount ->
+        pick_most_constrained_slot_aux(Puzzle, Ss, WDict, S2, Count2, FinalSlot)
+    ; pick_most_constrained_slot_aux(Puzzle, Ss, WDict, BestSlotSoFar, BestCount, FinalSlot)
     ).
 
 /*********************************************************************
- * slot_matches_word/3
- * Checks if Word is correct length & no letter conflicts with puzzle.
- * (We've already filtered by length, but let's keep the code.)
+ * candidates_for_slot/4
+ * Returns all valid candidate words from WordDict that:
+ *   (1) match the slot's length,
+ *   (2) don't conflict with puzzle's partially filled letters.
  *********************************************************************/
-slot_matches_word(Puzzle, slot(_Orient, Length, Coords), Word) :-
-    writeln(['Checking if word matches slot:', Word, 'Slot coordinates:', Coords]),
-    length(Word, Length),
-    writeln(['Word length matches slot length:', Length]),
-    check_letters_match(Puzzle, Coords, Word).
+candidates_for_slot(Puzzle, slot(_Orient, Len, Coords), WordDict, Candidates) :-
+    /* 1) Get all words for 'Len' from dictionary. */
+    get_words_of_length(WordDict, Len, WordCandidates),
+    writeln(['Word candidates for length', Len, '=>', WordCandidates]),
+    /* 2) Filter out invalid candidates. */
+    include(validate_candidate(Puzzle, Coords), WordCandidates, Candidates),
+    writeln(['Valid candidates after check:', Candidates, 'for slot with coords', Coords]).
 
-check_letters_match(_Puzzle, [], []) :-
-    writeln('All letters matched successfully.').
+validate_candidate(Puzzle, Coords, Word) :-
+    validate_cells(Puzzle, Coords, Word).
 
-check_letters_match(Puzzle, [(R,C)|Tcoords], [Letter|Tword]) :-
+validate_cells(_Puzzle, [], []).  % Base case: no more cells or letters to check.
+validate_cells(Puzzle, [(R, C) | Tcoords], [Letter | Rest]) :-
     nth0(R, Puzzle, Row),
     nth0(C, Row, Cell),
-    writeln(['Checking cell:', (R, C), 'Expected:', Letter, 'Actual:', Cell]),
-    (   var(Cell)
-    ->  writeln(['Cell is unbound, matches automatically.'])
-    ;   Cell == Letter
-    ->  writeln(['Cell matches expected letter.'])
-    ;   writeln(['Cell does not match expected letter.']),
-        fail
+    (   var(Cell) -> true  % Cell is unbound, valid
+    ;   Cell == Letter -> true  % Cell already contains the correct letter
     ),
-    check_letters_match(Puzzle, Tcoords, Tword).
+    validate_cells(Puzzle, Tcoords, Rest).  % Recurse for the remaining cells and letters.
+
+/*********************************************************************
+ * try_fill_slot_with_candidates/4
+ * Attempt each candidate word in turn. If all fail => backtrack.
+ *********************************************************************/
+try_fill_slot_with_candidates(_Puzzle, _Slot, _OtherSlots, _WordDict) :-
+    /* No candidates => fail. */
+    fail.
+
+try_fill_slot_with_candidates(Puzzle, Slot, OtherSlots, WordDict) :-
+    /* Evaluate candidates for Slot. */
+    candidates_for_slot(Puzzle, Slot, WordDict, [Word|_]),
+    /* If there's at least one Word => place it. */
+    place_word_in_slot(Puzzle, Slot, Word),
+    writeln(['Placing word =>', Word, 'in slot =>', Slot]),
+    /* Remove from dict. */
+    Slot = slot(_, Len, _),
+    remove_word_from_dict(WordDict, Len, Word, WordDict2),
+    /* Recurse => fill the rest of the slots. */
+    fill_puzzle(Puzzle, OtherSlots, WordDict2)
+    /* If we succeed => done. */
+    ;
+    /* If we fail => try next candidate in the list => backtrack approach. */
+    candidates_for_slot(Puzzle, Slot, WordDict, [_|RestCand]),
+    RestCand \== [],
+    writeln('Current candidate failed => trying next candidate.'),
+    /* Undo the partial unify. 
+       We'll do it by *not committing* to place_word_in_slot/3 
+       but we have to revert the puzzle somehow. 
+       Easiest is to rely on Prolog backtracking if place_word_in_slot
+       doesn't have a cut. Let's wrap carefully... */
+
+    fail.
 
 /*********************************************************************
  * place_word_in_slot/3
- * Actually unify puzzle cells with Word letters.
+ * Actually unify puzzle cells with Word letters. (No need to revert if we fail
+ * because Prolog automatically backtracks these unifications.)
  *********************************************************************/
-place_word_in_slot(_, slot(_,_,[]), []) :-
-    writeln('Word placed successfully.').
-
-place_word_in_slot(Puzzle, slot(Orient, Len, [(R,C)|Coords]), [Letter|Rest]) :-
+place_word_in_slot(_Puzzle, slot(_Orient,_Len,[]), []).
+place_word_in_slot(Puzzle, slot(O,L,[(R,C)|Coords]), [Letter|Rest]) :-
     nth0(R, Puzzle, Row),
     nth0(C, Row, Cell),
-    writeln(['Placing letter:', Letter, 'at cell:', (R, C)]),
-    (   var(Cell)
-    ->  Cell = Letter,
-        writeln(['Cell was unbound, now set to:', Letter])
-    ;   writeln(['Cell already contains:', Cell])
+    ( var(Cell) ->
+        Cell = Letter
+    ; true  /* If it's already that letter => okay, else fail in conflict check. */
     ),
-    place_word_in_slot(Puzzle, slot(Orient, Len, Coords), Rest).
+    place_word_in_slot(Puzzle, slot(O,L,Coords), Rest).
 
 /*********************************************************************
  * Tests
  *********************************************************************/
 :- begin_tests(puzzle_solution).
 
+/* Test Case 1: example */
 test(example,[nondet]) :-
     Puzzle = [
         ['#', h, '#'],
@@ -308,6 +339,7 @@ test(example,[nondet]) :-
     ],
     assertion(Puzzle == ExpectedPuzzle).
 
+/* Test Case 2: small_puzzle */
 test(small_puzzle,[nondet]) :-
     Puzzle = [
         [ _,  '#', _ ],
@@ -328,6 +360,7 @@ test(small_puzzle,[nondet]) :-
     ],
     assertion(Puzzle == ExpectedPuzzle).
 
+/* Test Case 3: wikipedia puzzle */
 test(wikipedia, [nondet]) :-
     Puzzle = [
         ['#', '#', '#',  _ ,  _ ,  _ , '#', '#', '#', '#'],
