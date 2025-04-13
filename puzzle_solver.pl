@@ -9,14 +9,23 @@
  * (blocked), a letter atom, or an unbound variable (_). WordList is
  * a list of word-lists, e.g. [ [c,a,t], [b,a,g], ... ].
  *
- * Changes:
- *  (1) After filling all slots, we now *verify* that WordList is empty.
- *      If leftover words remain, we fail.
+ * We do:
+ *  (1) Extract all slots.
+ *  (2) Sort them by how many letters are already prefilled.
+ *  (3) Fill each slot, removing each used word.
+ *  (4) We fail if leftover words remain after filling all slots.
+ *
+ * Key improvement: skip words that do not match the slot's length
+ *                 to prune the search drastically.
  *********************************************************************/
 puzzle_solution(Puzzle, WordList) :-
+    precompute_letter_frequencies(WordList, LetterFreqs),
+    writeln(['Letter frequencies:', LetterFreqs]),
+    sort_words_by_heuristic(WordList, LetterFreqs, SortedWordList),
+    writeln(['Sorted WordList:', SortedWordList]),
     extract_all_slots(Puzzle, UnorderedSlots),
     sort_slots_by_prefilled(Puzzle, UnorderedSlots, Slots),
-    fill_slots(Slots, Puzzle, WordList).
+    fill_slots(Slots, Puzzle, SortedWordList).
 
 /*********************************************************************
  * extract_all_slots/2
@@ -40,7 +49,6 @@ extract_horizontal_slots(Puzzle, HSlots) :-
     format("NumRows = ~w~n", [NumRows]),
     NumRowsMinus1 is NumRows - 1,
 
-    % For each row, find consecutive open cells
     findall(RowSlots,
       ( between(0, NumRowsMinus1, RowIndex),
         format("RowIndex = ~w~n", [RowIndex]),
@@ -58,13 +66,12 @@ row_to_slots(RowList, RowIndex, RowSlots) :-
 
 collect_runs([], _, []).
 collect_runs([Cell|T], Col, Runs) :-
-    Cell == '#',
-    % blocked cell => move on
+    Cell == '#',  % blocked => skip
     Col1 is Col + 1,
     collect_runs(T, Col1, Runs).
 
 collect_runs([Cell|T], Col, [[Col|MoreCols] | OtherRuns]) :-
-    Cell \== '#',  % open cell (var or letter)
+    Cell \== '#',  % open cell
     ColPlusOne is Col + 1,
     collect_consecutive(T, ColPlusOne, MoreCols, Remainder),
     length(MoreCols, RunLength),
@@ -73,7 +80,7 @@ collect_runs([Cell|T], Col, [[Col|MoreCols] | OtherRuns]) :-
 
 collect_consecutive([], _Col, [], []) :- !.
 collect_consecutive([Cell|T], _Col, [], T) :-
-    Cell == '#',
+    Cell == '#', 
     !.
 collect_consecutive([Cell|T], Col, [Col|More], Remainder) :-
     Cell \== '#',
@@ -101,14 +108,11 @@ extract_vertical_slots(Puzzle, VSlots) :-
     fix_transposed_coords(TempHSlots, VSlots).
 
 fix_transposed_coords([], []).
-fix_transposed_coords(
-    [slot(horizontal,Len,TransCoords)|T1],
-    [slot(vertical,Len,OrigCoords)|T2]
-) :-
-    maplist(swap_rc, TransCoords, OrigCoords),
-    fix_transposed_coords(T1, T2).
+fix_transposed_coords([slot(horizontal,Len,TC)|T],[slot(vertical,Len,OC)|T2]) :-
+    maplist(swap_rc, TC, OC),
+    fix_transposed_coords(T, T2).
 
-swap_rc((R,C), (C,R)).
+swap_rc((R,C),(C,R)).
 
 /*********************************************************************
  * sort_slots_by_prefilled/3
@@ -117,37 +121,62 @@ swap_rc((R,C), (C,R)).
  *********************************************************************/
 sort_slots_by_prefilled(_, [], []).
 sort_slots_by_prefilled(Puzzle, [Slot|Others], SortedSlots) :-
-    slot_prefilled_count(Puzzle, Slot, Count),
+    slot_prefilled_count(Puzzle, Slot, PrefilledCount),
+    Slot = slot(_, Length, _),
     sort_slots_by_prefilled(Puzzle, Others, Rest),
-    insert_by_count(Slot-Count, Rest, SortedSlots).
+    insert_by_count(Slot-(PrefilledCount, Length), Rest, SortedSlots).
 
 slot_prefilled_count(_Puzzle, slot(_Orient,_Len,[]), 0).
 slot_prefilled_count(Puzzle, slot(Orient, Len, [(R,C)|Coords]), Count) :-
     nth0(R, Puzzle, Row),
     nth0(C, Row, Cell),
     (   var(Cell)
-    ->  ThisOne = 0  % still unbound
+    ->  ThisOne = 0
     ;   Cell == '#'
-    ->  ThisOne = 0  % blocked
-    ;   ThisOne = 1  % already a letter
+    ->  ThisOne = 0
+    ;   ThisOne = 1
     ),
     slot_prefilled_count(Puzzle, slot(Orient,Len,Coords), Rest),
     Count is ThisOne + Rest.
 
 insert_by_count(SC, [], [SC]).
-insert_by_count(SlotA-CountA, [SlotB-CountB|Rest], [SlotA-CountA,SlotB-CountB|Rest]) :-
-    CountA >= CountB, !.
+insert_by_count(SlotA-(CountA, LengthA), [SlotB-(CountB, LengthB)|Rest], [SlotA-(CountA, LengthA), SlotB-(CountB, LengthB)|Rest]) :-
+    (CountA > CountB ; (CountA == CountB, LengthA >= LengthB)), !.
 insert_by_count(SC, [X|Rest], [X|NewRest]) :-
     insert_by_count(SC, Rest, NewRest).
+
+
+sort_words_by_heuristic(WordList, LetterFreqs, SortedWordList) :-
+    maplist(word_score_with_word(LetterFreqs), WordList, ScoredWords),
+    keysort(ScoredWords, SortedScoredWords),
+    reverse(SortedScoredWords, DescendingScoredWords),  % Sort descending
+    pairs_values(DescendingScoredWords, SortedWordList).
+
+word_score_with_word(LetterFreqs, Word, Score-Word) :-
+    word_score(Word, LetterFreqs, Score).
+
+% Precompute letter frequencies for the entire WordList
+precompute_letter_frequencies(WordList, LetterFreqs) :-
+    flatten(WordList, Letters),  % Flatten all words into a single list of letters
+    findall(Letter-Count, (member(Letter, Letters), count_occurrences(Letter, Letters, Count)), Pairs),
+    sort(Pairs, LetterFreqs).  % Remove duplicates and sort by letter
+
+% Count occurrences of a letter in a list
+count_occurrences(Letter, List, Count) :-
+    include(=(Letter), List, Filtered),
+    length(Filtered, Count).
+
+word_score(Word, LetterFreqs, Score) :-
+    findall(Freq, (member(Letter, Word), member(Letter-Freq, LetterFreqs)), Frequencies),
+    sum_list(Frequencies, Score).
 
 /*********************************************************************
  * fill_slots/3
  * Fill each slot exactly once, removing used words from WordList
- * NOW checks if WordList is empty or not at the end.
+ * If leftover words remain after last slot => fail.
  *********************************************************************/
 fill_slots([], _Puzzle, WordList) :-
     writeln(['Final WordList:', WordList]),
-    % If *no more slots*, we succeed only if *WordList is empty*
     ( WordList == [] ->
          writeln('All slots filled successfully.'), !
       ;  writeln('No more slots, but leftover words remain => fail'),
@@ -155,45 +184,66 @@ fill_slots([], _Puzzle, WordList) :-
     ).
 
 fill_slots([Slot-_|OtherSlots], Puzzle, WordList) :-
-    % We have at least one slot, so we must pick a word from WordList
-    % If WordList is empty => fail automatically
     writeln(['Current WordList:', WordList]),
     ( WordList == [] ->
         writeln('Ran out of words before filling all slots => fail'),
         fail
     ; true
     ),
-    Slot = slot(_,_,_),
+    Slot = slot(_,Len,Coords),
     writeln(['Filling slot:', Slot]),
-    select_a_word_and_fill(Slot, Puzzle, WordList, NewWordList),
+    select_a_word_and_fill(Slot, Len, Coords, Puzzle, WordList, NewWordList),
     writeln(['WordList after filling slot:', NewWordList]),
     fill_slots(OtherSlots, Puzzle, NewWordList).
 
 /*********************************************************************
- * select_a_word_and_fill/4
+ * select_a_word_and_fill/6
  * Try each Word in WordList. On success, remove that Word. Otherwise fail.
+ * Also skip words that do not match the slot's length, to prune search.
  *********************************************************************/
-select_a_word_and_fill(Slot, Puzzle, [Word|RestWords], Rest) :-
+select_a_word_and_fill(Slot, SlotLen, Coords, Puzzle, WordList, FinalWordList) :-
+    % Temporarily filter words by length
+    include(correct_length(SlotLen), WordList, FilteredWords),
+    writeln(['Filtered WordList for slot length', SlotLen, ':', FilteredWords]),
+    try_words(Slot, Coords, Puzzle, FilteredWords, WordList, FinalWordList).
+
+filter_and_sort_words(SlotLen, WordList, LetterFreqs, SortedWords) :-
+    findall(Score-Word,
+        (   member(Word, WordList),
+            length(Word, SlotLen),  % Filter by length
+            word_score(Word, LetterFreqs, Score)  % Compute heuristic score
+        ),
+        ScoredWords),
+    keysort(ScoredWords, SortedScoredWords),
+    reverse(SortedScoredWords, DescendingScoredWords),  % Sort descending
+    pairs_values(DescendingScoredWords, SortedWords).
+
+correct_length(SlotLen, Word) :-
+    length(Word, SlotLen).
+
+try_words(_, _, _, [], _, _) :-
+    writeln(['No words left to try for this slot. Backtracking...']),
+    fail.  % No words left to try, fail
+
+try_words(Slot, Coords, Puzzle, [Word|RestWords], OriginalWordList, FinalWordList) :-
     writeln(['Trying word', Word, 'in slot', Slot]),
     (   slot_matches_word(Puzzle, Slot, Word)
     ->  writeln(['Success check for', Word]),
         place_word_in_slot(Puzzle, Slot, Word),
         writeln(['Placed word', Word, 'in slot', Slot]),
-        % Remove Word from list => pass along RestWords
-        writeln(['Removing word', Word, 'from WordList']),
-        Rest = RestWords,
-        writeln(['WordList after removal:', Rest])
+        % Remove the word from the current WordList
+        select(Word, OriginalWordList, UpdatedWordList),
+        writeln(['WordList after removal:', UpdatedWordList]),
+        FinalWordList = UpdatedWordList
     ;   writeln(['Failed check for', Word]),
-        append(RestWords, [Word], UpdatedRestWords),
-        writeln(['WordList after restoration:', UpdatedRestWords]),
-        select_a_word_and_fill(Slot, Puzzle, UpdatedRestWords, Rest)
-    )
-    ;   % If fail, we backtrack => try next Word in WordList
-        select_a_word_and_fill(Slot, Puzzle, RestWords, Rest).
+        % Pass the current WordList (unchanged) to the next recursive call
+        try_words(Slot, Coords, Puzzle, RestWords, OriginalWordList, FinalWordList)
+    ).
 
 /*********************************************************************
  * slot_matches_word/3
  * Checks if Word is correct length & no letter conflicts with puzzle.
+ * (We've already filtered by length, but let's keep the code.)
  *********************************************************************/
 slot_matches_word(Puzzle, slot(_Orient, Length, Coords), Word) :-
     writeln(['Checking if word matches slot:', Word, 'Slot coordinates:', Coords]),
@@ -236,11 +286,10 @@ place_word_in_slot(Puzzle, slot(Orient, Len, [(R,C)|Coords]), [Letter|Rest]) :-
     place_word_in_slot(Puzzle, slot(Orient, Len, Coords), Rest).
 
 /*********************************************************************
- * Test Cases using plunit
+ * Tests
  *********************************************************************/
 :- begin_tests(puzzle_solution).
 
-/* Test Case 1: example */
 test(example,[nondet]) :-
     Puzzle = [
         ['#', h, '#'],
@@ -259,26 +308,19 @@ test(example,[nondet]) :-
     ],
     assertion(Puzzle == ExpectedPuzzle).
 
-/* Test Case 2: small_puzzle */
 test(small_puzzle,[nondet]) :-
     Puzzle = [
         [ _,  '#', _ ],
         [ _,   _,  _ ],
         [ '#', _, '#' ]
     ],
-    % *Focus on emptying the WordList*
-    % We'll show example words that get used up exactly
     WordList = [
-        [i, t],
-        [a, r],
         [e, c],
-        [c, a, t]
+        [i, t],
+        [c, a, t],
+        [a, r]
     ],
     puzzle_solution(Puzzle, WordList),
-    % Expect puzzle to become:
-    %   Row0: [ e, '#', i ]
-    %   Row1: [ c,  a,  t ]
-    %   Row2: ['#', r, '#' ]
     ExpectedPuzzle = [
         [ e, '#', i ],
         [ c,  a,  t ],
@@ -286,7 +328,6 @@ test(small_puzzle,[nondet]) :-
     ],
     assertion(Puzzle == ExpectedPuzzle).
 
-/* Test Case 3: wikipedia puzzle (verbatim) */
 test(wikipedia, [nondet]) :-
     Puzzle = [
         ['#', '#', '#',  _ ,  _ ,  _ , '#', '#', '#', '#'],
@@ -318,7 +359,7 @@ test(wikipedia, [nondet]) :-
         [v, e, s, i, c, l, e]
     ],
     puzzle_solution(Puzzle, WordList),
-    Puzzle = [
+    ExpectedPuzzle = [
         ['#', '#', '#',  e ,  v ,  o , '#', '#', '#', '#'],
         ['#', '#', '#',  d ,  e ,  n ,  s , '#', '#', '#'],
         ['#',  d ,  a ,  i ,  s , '#',  i ,  o , '#', '#'],
@@ -326,7 +367,7 @@ test(wikipedia, [nondet]) :-
         ['#',  g ,  i , '#',  c ,  l ,  o ,  d , '#', '#'],
         ['#', '#',  d ,  o ,  l ,  e , '#', '#', '#', '#'],
         ['#', '#', '#',  r ,  e ,  f , '#', '#', '#', '#']
-    ].
+    ],
+    assertion(Puzzle == ExpectedPuzzle).
 
 :- end_tests(puzzle_solution).
-
