@@ -460,23 +460,17 @@ validate_cells(Puzzle, [(R, C) | Tcoords], [Letter | Rest]) :-
  * If a candidate fails, we backtrack and try the next one.
  *********************************************************************/
 try_fill_slot_with_candidates(Puzzle, Slot, OtherSlots, WordDict) :-
-    /* Evaluate candidates for Slot. */
-    candidates_for_slot(Puzzle, Slot, WordDict, [Word|_]),
-    /* If there's at least one Word => place it. */
+    candidates_for_slot(Puzzle, Slot, WordDict, Candidates),
+    ( Candidates = [] ->
+        format('❌ No candidates for slot: ~w~n', [Slot]), fail
+    ; true ),
+    member(Word, Candidates),
+    format('✅ Trying word ~w in slot ~w~n', [Word, Slot]),
     place_word_in_slot(Puzzle, Slot, Word),
-    writeln(['Placing word =>', Word, 'in slot =>', Slot]),
-    /* Remove from dict. */
     Slot = slot(_, Len, _),
     remove_word_from_dict(WordDict, Len, Word, WordDict2),
-    /* Recurse => fill the rest of the slots. */
-    fill_puzzle(Puzzle, OtherSlots, WordDict2)
-    /* If we succeed => done. */
-    ;
-    /* If we fail => try next candidate in the list => backtrack approach. */
-    candidates_for_slot(Puzzle, Slot, WordDict, [_|RestCand]),
-    RestCand \== [],
-    writeln('Current candidate failed => trying next candidate.'),
-    fail.
+    fill_puzzle(Puzzle, OtherSlots, WordDict2).
+
 
 /*********************************************************************
  * place_word_in_slot/3
@@ -655,6 +649,188 @@ test(most_constrained_slot, [nondet]) :-
         [ z,  x,  a,  r ],
         [ h,  a,  t,  e ],
         [ c,  k,  e,  e ]
+    ],
+    assertion(Puzzle == ExpectedPuzzle).
+
+/* Test Case 7: 10x10 sized puzzle */
+test(ten_by_ten, [nondet]) :-
+    Puzzle = [
+        [ _,  _,  _,  _,  _,  _,  _,  _,  _,  _ ],
+        [ _,  _,  _,  _,  _, '#', _,  _,  _,  _ ],
+        [ _,  _, '#', _,  _, '#', _,  _,  _,  _ ],
+        [ _,  _, '#', _,  _,  _,  _, '#', _,  _ ],
+        [ _,  _,  _,  _,  _,  _,  _,  _,  _,  _ ],
+        [ _,  _, '#', _,  _, '#', _,  _,  _,  _ ],
+        [ _,  _,  _,  _,  _,  _,  _, '#', _,  _ ],
+        [ _,  _,  _, '#', _,  _,  _,  _,  _, '#'],
+        [ _,  _,  _,  _,  _,  _,  _,  _,  _,  _ ],
+        ['#', _,  _, '#', _,  _, '#', _,  _,  _ ]
+    ],
+    WordList = [
+        % Horitzontal
+        [b, l, a, c, k, s, h, i, r, t],
+        [e, a, g, l, e],
+        [a, g, e, d],
+        [a, m],
+        [e, z],
+        [i, s, h, m],
+        [u, e],
+        [a, i, p, r],
+        [h, r],
+        [t, r, n, n, o, q, s, o, c, d],
+        [i, o],
+        [e, a],
+        [t, l, e, m],
+        [f, p, q, d, f, s, y],
+        [p, o],
+        [u, m, r],
+        [a, t, l, s, h],
+        [l, w, n, e, i, u, e, y, d, x],
+        [m, e],
+        [r, v],
+        [t, u, v],
+        % Vertical
+        [b, e, a, u, t, i, f, u, l],
+        [l, a, m, e, r, o, p, m, w, m],
+        [a, g],
+        [q, r, n, e],
+        [c, l, e, a, n, e, d],
+        [k, e, z, i, o, a, f, a, i, r],
+        [p, q],
+        [s, t, u, v],
+        [h, a, i, r, s, t, y, l, e],
+        [i, g, s],
+        [o, l],
+        [s, y, t],
+        [r, e, h, h, c, e, p, h, d, u],
+        [t, d, m, r, d, m, o],
+        [x, v]
+    ],
+    puzzle_solution(Puzzle, WordList),
+    print_puzzle(Puzzle),
+    ExpectedPuzzle = [
+        [ b,  l,  a,  c,  k,  s,  h,  i,  r,  t ],
+        [ e,  a,  g,  l,  e, '#', a,  g,  e,  d ],
+        [ a,  m, '#', e,  z, '#', i,  s,  h,  m ],
+        [ u,  e, '#', a,  i,  p,  r, '#', h,  r ],
+        [ t,  r,  n,  n,  o,  q,  s,  o,  c,  d ],
+        [ i,  o, '#', e,  a, '#', t,  l,  e,  m ],
+        [ f,  p,  q,  d,  f,  s,  y, '#', p,  o ],
+        [ u,  m,  r, '#', a,  t,  l,  s,  h, '#'],
+        [ l,  w,  n,  e,  i,  u,  e,  y,  d,  x ],
+        ['#', m,  e, '#', r,  v, '#', t,  u,  v ]
+    ],
+    assertion(Puzzle == ExpectedPuzzle).
+
+/* Test Case 8: 15x15 sized puzzle */
+test(fifteen_by_fifteen, [nondet]) :-
+    Puzzle = [
+        [ _,  _,  _,  _,  _, '#', _,  _,  _,  _,  _,  _,  _,  _,  _ ],
+        [ _,  _,  _,  _,  _, '#', _, '#', _,  _,  _,  _,  _,  _,  _ ],
+        [ _, '#', _,  _,  _, '#', _, '#', _,  _,  _,  _,  _,  _,  _ ],
+        [ _,  _,  _,  _,  _, '#', _,  _,  _, '#', _,  _,  _,  _,  _ ],
+        [ _,  _,  _,  _,  _, '#', _,  _,  _,  _,  _,  _,  _,  _,  _ ],
+        [ _,  _, '#','#', _, '#','#','#','#', _,  _,  _,  _,  _,  _ ],
+        [ _,  _, '#', _,  _, '#', _,  _,  _,  _,  _,  _,  _,  _,  _ ],
+        [ _,  _,  _,  _,  _, '#', _,  _,  _,  _,  _,  _,  _,  _, '#'],
+        [ _,  _, '#', _,  _, '#', _,  _,  _,  _, '#','#','#','#','#'],
+        [ _,  _, '#', _,  _, '#', _,  _,  _,  _,  _,  _,  _,  _, '#'],
+        [ _,  _,  _,  _,  _, '#', _,  _,  _, '#', _,  _,  _,  _,  _ ],
+        [ _,  _,  _,  _,  _, '#', _,  _, '#','#','#', _, '#','#','#'],
+        [ _, '#','#', _,  _, '#', _,  _,  _, '#', _,  _,  _,  _,  _ ],
+        [ _,  _,  _,  _,  _, '#', _,  _,  _, '#', _,  _,  _,  _,  _ ],
+        [ _,  _,  _,  _,  _, '#', _,  _, '#', _,  _,  _,  _,  _,  _ ]
+    ],
+    WordList = [
+        [a, b, c, d, e],
+        [f, g, h, i, j, k, l, m, n],
+        [o, p, q, r, s],
+        [u, v, w, x, y, z, a],
+        [c, d, e],
+        [g, h, i, j, k, l, m],
+        [n, o, p, q, r],
+        [s, t, u],
+        [v, w, x, y, z],
+        [a, b, c, d, e],
+        [f, g, h, i, j, k, l, m, n],
+        [o, p],
+        [r, s, t, u, v, w],
+        [x, y],
+        [z, a],
+        [b, c, d, e, f, g, h, i, j],
+        [k, l, m, n, o],
+        [p, q, r, s, t, u, v, w],
+        [x, y],
+        [a, b],
+        [c, d, e, f],
+        [h, i],
+        [j, k],
+        [l, m, n, o, p, q, r, s],
+        [t, u, v, w, x],
+        [y, z, a],
+        [b, c, d, e, f],
+        [g, h, i, j, k],
+        [l, m],
+        [q, r],
+        [s, t, u],
+        [v, w, x, y, z],
+        [a, b, c, d, e],
+        [f, g, h],
+        [i, j, k, l, m],
+        [n, o, p, q, r],
+        [s, t],
+        [u, v, w, x, y, z],
+        [a, o, b, n, a, o, x, k, x, h, t, g, p, a, n],
+        [b, p],
+        [o, b, p, y, l, y, i, u, h],
+        [b, o],
+        [c, q, c, p, c],
+        [v, i],
+        [c, p],
+        [d, r, d, q, d],
+        [z, n, a, j, w, j, q, d, q],
+        [e, s, e, r, e, q, a, o, b, k, x, k, r, e, r],
+        [f, t, f, s, f],
+        [b, p, c, l, y, l, s, f, s],
+        [t, g],
+        [c, q, d, m, z, m, t, g, t],
+        [h, u, g, u, h],
+        [d, r, e, n, a],
+        [u, h],
+        [i, v, h],
+        [i, r, e, s, f, o],
+        [j, w, i, v, j, s, f, t],
+        [p, b],
+        [v, i, v],
+        [k, x, j, w, k, t, g, u],
+        [q, c, o, w, j, w],
+        [l, y, k, x, l, u, h, v],
+        [r, d],
+        [x, k, x],
+        [m, z, l, y, m, v, i, w],
+        [s, e],
+        [y, l, y],
+        [n, a, m, z, n, w, j],
+        [z, m, z]
+    ],
+    puzzle_solution(Puzzle, WordList),
+    print_puzzle(Puzzle),  % Print the completed puzzle
+    ExpectedPuzzle = [
+        [ a,  b,  c,  d,  e, '#', f,  g,  h,  i,  j,  k,  l,  m,  n ],
+        [ o,  p,  q,  r,  s, '#', t, '#', u,  v,  w,  x,  y,  z,  a ],
+        [ b, '#', c,  d,  e, '#', f, '#', g,  h,  i,  j,  k,  l,  m ],
+        [ n,  o,  p,  q,  r, '#', s,  t,  u, '#', v,  w,  x,  y,  z ],
+        [ a,  b,  c,  d,  e, '#', f,  g,  h,  i,  j,  k,  l,  m,  n ],
+        [ o,  p, '#','#', q, '#','#','#','#', r,  s,  t,  u,  v,  w ],
+        [ x,  y, '#', z,  a, '#', b,  c,  d,  e,  f,  g,  h,  i,  j ],
+        [ k,  l,  m,  n,  o, '#', p,  q,  r,  s,  t,  u,  v,  w, '#'],
+        [ x,  y, '#', a,  b, '#', c,  d,  e,  f, '#','#','#','#','#'],
+        [ h,  i, '#', j,  k, '#', l,  m,  n,  o,  p,  q,  r,  s, '#'],
+        [ t,  u,  v,  w,  x, '#', y,  z,  a, '#', b,  c,  d,  e,  f ],
+        [ g,  h,  i,  j,  k, '#', l,  m, '#','#','#', o, '#','#','#'],
+        [ p, '#','#', q,  r, '#', s,  t,  u, '#', v,  w,  x,  y,  z ],
+        [ a,  b,  c,  d,  e, '#', f,  g,  h, '#', i,  j,  k,  l,  m ],
+        [ n,  o,  p,  q,  r, '#', s,  t, '#', u,  v,  w,  x,  y,  z ]
     ],
     assertion(Puzzle == ExpectedPuzzle).
 
