@@ -510,12 +510,20 @@ print_row(Row) :-
     debug(puzzle, '~w', [Row]).
 
 /*********************************************************************
- * Tests
+ * Tests created using SWI-Prolog's plunit library
+ * To run a specific test, use:
+    ?- run_tests(puzzle_solution:example).
+ * To run all tests, use:
+    ?- run_tests(puzzle_solution).
+
+ * Test cases are written to expect at most one solution.
+
+ * Debugging is forcibly enabled by default for all tests
  *********************************************************************/
 :- begin_tests(puzzle_solution, [setup(debug(puzzle))]).
 
 /* Test Case 1: example */  
-test(example,[nondet]) :-
+test(example, true(Solutions = [ExpectedPuzzle])) :-
     debug(puzzle, '>>> STARTING EXAMPLE TEST <<<', []),
     Puzzle = [
         ['#', h, '#'],
@@ -526,18 +534,18 @@ test(example,[nondet]) :-
         [h, a, t],
         [b, a, g]
     ],
-    puzzle_solution(Puzzle, WordList),
-    print_puzzle(Puzzle),
+    copy_term(Puzzle, Sol),
+    findall(Sol, puzzle_solution(Sol, WordList), Solutions),
+    maplist(print_puzzle, Solutions),
     ExpectedPuzzle = [
         ['#', h, '#'],
         [ b,  a,  g ],
         ['#', t, '#']
     ],
-    assertion(Puzzle == ExpectedPuzzle),
     debug(puzzle, '>>> EXAMPLE TEST PASSED <<<', []).
 
 /* Test Case 2: small_puzzle */
-test(small_puzzle,[nondet]) :-
+test(small_puzzle, true(Solutions = [ExpectedPuzzle])) :-
     debug(puzzle, '>>> STARTING SMALL PUZZLE TEST <<<', []),
     Puzzle = [
         [ _,  '#', _ ],
@@ -550,25 +558,25 @@ test(small_puzzle,[nondet]) :-
         [c, a, t],
         [a, r]
     ],
-    puzzle_solution(Puzzle, WordList),
-    print_puzzle(Puzzle),
+    copy_term(Puzzle, Sol),
+    findall(Sol, puzzle_solution(Sol, WordList), Solutions),
+    maplist(print_puzzle, Solutions),
     ExpectedPuzzle = [
         [ e, '#', i ],
         [ c,  a,  t ],
         ['#', r, '#' ]
     ],
-    assertion(Puzzle == ExpectedPuzzle),
     debug(puzzle, '>>> SMALL PUZZLE TEST PASSED <<<', []).
 
 /* Test Case 3: wikipedia puzzle */
-test(wikipedia, [nondet]) :-
+test(wikipedia, true(Solutions = [ExpectedPuzzle])) :-
     debug(puzzle, '>>> STARTING WIKIPEDIA PUZZLE TEST <<<', []),
     Puzzle = [
         ['#', '#', '#',  _ ,  _ ,  _ , '#', '#', '#', '#'],
         ['#', '#', '#',  _ ,  _ ,  _ ,  _ , '#', '#', '#'],
-        ['#',  _ ,  _ ,  _ ,  _ , '#',  _ ,  _ , '#', '#'],
-        ['#',  _ ,  _ ,  _ ,  _ ,  _ ,  _ ,  _ , '#', '#'],
-        ['#',  _ ,  _ , '#',  _ ,  _ ,  _ ,  _ , '#', '#'],
+        ['#',  d ,  _ ,  _ ,  _ , '#',  _ ,  _ , '#', '#'],
+        ['#',  a ,  _ ,  _ ,  _ ,  _ ,  _ ,  _ , '#', '#'],
+        ['#',  g ,  _ , '#',  _ ,  _ ,  _ ,  _ , '#', '#'],
         ['#', '#',  _ ,  _ ,  _ ,  _ , '#', '#', '#', '#'],
         ['#', '#', '#',  _ ,  _ ,  _ , '#', '#', '#', '#']
     ],
@@ -592,8 +600,9 @@ test(wikipedia, [nondet]) :-
         [a, r, t, i, c, l, e],
         [v, e, s, i, c, l, e]
     ],
-    puzzle_solution(Puzzle, WordList),
-    print_puzzle(Puzzle),
+    copy_term(Puzzle, Sol),
+    findall(Sol, puzzle_solution(Sol, WordList), Solutions),
+    maplist(print_puzzle, Solutions),
     ExpectedPuzzle = [
         ['#', '#', '#',  e ,  v ,  o , '#', '#', '#', '#'],
         ['#', '#', '#',  d ,  e ,  n ,  s , '#', '#', '#'],
@@ -603,11 +612,10 @@ test(wikipedia, [nondet]) :-
         ['#', '#',  d ,  o ,  l ,  e , '#', '#', '#', '#'],
         ['#', '#', '#',  r ,  e ,  f , '#', '#', '#', '#']
     ],
-    assertion(Puzzle == ExpectedPuzzle),
     debug(puzzle, '>>> WIKIPEDIA PUZZLE TEST PASSED <<<', []).
 
 /* Test Case 4: More slots than words (should fail) */
-test(more_slots_than_words, [fail]) :-
+test(more_slots_than_words, true(Solutions = [])) :-
     debug(puzzle, '>>> STARTING MORE SLOTS THAN WORDS TEST <<<', []),
     Puzzle = [
         [ _,  _,  _,  _ ],
@@ -619,12 +627,12 @@ test(more_slots_than_words, [fail]) :-
         [c, a, t],
         [d, o, g]
     ],
-    puzzle_solution(Puzzle, WordList),
-    print_puzzle(Puzzle),
+    copy_term(Puzzle, Sol),
+    findall(Sol, puzzle_solution(Sol, WordList), Solutions),
     debug(puzzle, '>>> MORE SLOTS THAN WORDS TEST FAILED <<<', []).
 
 /* Test Case 5: More words than slots (should fail) */
-test(more_words_than_slots, [fail]) :-
+test(more_words_than_slots, true(Solutions = [])) :-
     debug(puzzle, '>>> STARTING MORE WORDS THAN SLOTS TEST <<<', []),
     Puzzle = [
         ['#', _, '#'],
@@ -637,12 +645,12 @@ test(more_words_than_slots, [fail]) :-
         [c],
         [d]
     ],
-    puzzle_solution(Puzzle, WordList),
-    print_puzzle(Puzzle),
+    copy_term(Puzzle, Sol),
+    findall(Sol, puzzle_solution(Sol, WordList), Solutions),
     debug(puzzle, '>>> MORE WORDS THAN SLOTS TEST FAILED <<<', []).
 
 /* Test Case 6: Most constrained slot challenge */
-test(most_constrained_slot, [nondet]) :-
+test(most_constrained_slot, true(Solutions = [ExpectedPuzzle])) :-
     debug(puzzle, '>>> STARTING MOST CONSTRAINED SLOT TEST <<<', []),
     Puzzle = [
         [ _,  _,  r,  _ ],
@@ -660,19 +668,19 @@ test(most_constrained_slot, [nondet]) :-
         [r, a, t, e],
         [t, r, e, e]
     ],
-    puzzle_solution(Puzzle, WordList),
-    print_puzzle(Puzzle),
+    copy_term(Puzzle, Sol),
+    findall(Sol, puzzle_solution(Sol, WordList), Solutions),
+    maplist(print_puzzle, Solutions),
     ExpectedPuzzle = [
         [ c,  a,  r,  t ],
         [ z,  x,  a,  r ],
         [ h,  a,  t,  e ],
         [ c,  k,  e,  e ]
     ],
-    assertion(Puzzle == ExpectedPuzzle),
     debug(puzzle, '>>> MOST CONSTRAINED SLOT TEST PASSED <<<', []).
 
 /* Test Case 7: 10x10 sized puzzle */
-test(ten_by_ten, [nondet]) :-
+test(ten_by_ten, true(Solutions = [ExpectedPuzzle])) :-
     debug(puzzle, '>>> STARTING 10x10 PUZZLE TEST <<<', []),
     Puzzle = [
         [ _,  _,  _,  _,  _,  _,  _,  _,  _,  _ ],
@@ -726,8 +734,9 @@ test(ten_by_ten, [nondet]) :-
         [t, d, m, r, d, m, o],
         [x, v]
     ],
-    puzzle_solution(Puzzle, WordList),
-    print_puzzle(Puzzle),
+    copy_term(Puzzle, Sol),
+    findall(Sol, puzzle_solution(Sol, WordList), Solutions),
+    maplist(print_puzzle, Solutions),
     ExpectedPuzzle = [
         [ b,  l,  a,  c,  k,  s,  h,  i,  r,  t ],
         [ e,  a,  g,  l,  e, '#', a,  g,  e,  d ],
@@ -740,123 +749,116 @@ test(ten_by_ten, [nondet]) :-
         [ l,  w,  n,  e,  i,  u,  e,  y,  d,  x ],
         ['#', m,  e, '#', r,  v, '#', t,  u,  v ]
     ],
-    assertion(Puzzle == ExpectedPuzzle),
     debug(puzzle, '>>> 10x10 PUZZLE TEST PASSED <<<', []).
 
 /* Test Case 8: 15x15 sized puzzle */
-test(fifteen_by_fifteen, [nondet]) :-
+test(fifteen_by_fifteen, true(Solutions = [ExpectedPuzzle])) :-
     debug(puzzle, '>>> STARTING 15x15 PUZZLE TEST <<<', []),
     Puzzle = [
-        [ _,  _,  _,  _,  _, '#', _,  _,  _,  _,  _,  _,  _,  _,  _ ],
-        [ _,  _,  _,  _,  _, '#', _, '#', _,  _,  _,  _,  _,  _,  _ ],
-        [ _, '#', _,  _,  _, '#', _, '#', _,  _,  _,  _,  _,  _,  _ ],
-        [ _,  _,  _,  _,  _, '#', _,  _,  _, '#', _,  _,  _,  _,  _ ],
-        [ _,  _,  _,  _,  _, '#', _,  _,  _,  _,  _,  _,  _,  _,  _ ],
-        [ _,  _, '#','#', _, '#','#','#','#', _,  _,  _,  _,  _,  _ ],
-        [ _,  _, '#', _,  _, '#', _,  _,  _,  _,  _,  _,  _,  _,  _ ],
-        [ _,  _,  _,  _,  _, '#', _,  _,  _,  _,  _,  _,  _,  _, '#'],
-        [ _,  _, '#', _,  _, '#', _,  _,  _,  _, '#','#','#','#','#'],
-        [ _,  _, '#', _,  _, '#', _,  _,  _,  _,  _,  _,  _,  _, '#'],
-        [ _,  _,  _,  _,  _, '#', _,  _,  _, '#', _,  _,  _,  _,  _ ],
-        [ _,  _,  _,  _,  _, '#', _,  _, '#','#','#', _, '#','#','#'],
-        [ _, '#','#', _,  _, '#', _,  _,  _, '#', _,  _,  _,  _,  _ ],
-        [ _,  _,  _,  _,  _, '#', _,  _,  _, '#', _,  _,  _,  _,  _ ],
-        [ _,  _,  _,  _,  _, '#', _,  _, '#', _,  _,  _,  _,  _,  _ ]
+        [ _, '#', _,  _,  _,  _,  _,  _, '#', _,  _,  _,  _,  _,  _ ],
+        [ _,  _,  _, '#', _,  _,  _, '#', _,  _,  _,  _,  _,  _,  _ ],
+        [ _,  _,  _,  _,  _,  _,  _,  _, '#', _,  _,  _,  _,  _,  _ ],
+        [ _,  _,  _,  _, '#', _,  _,  _,  _,  _, '#',  _,  _,  _,  _ ],
+        [ _,  _,  _,  _,  _,  _, '#', _,  _,  _,  _,  _, '#', _,  _ ],
+        [ _,  _,  _,  _,  _,  _,  _,  _, '#', _,  _,  _,  _,  _, '#'],
+        [ _,  _,  _,  _,  _,  _,  _,  _, '#', _,  _,  _,  _,  _,  _ ],
+        [ _,  _, '#', _,  _,  _,  _,  _,  _, '#', _,  _,  _,  _,  _ ],
+        [ _,  _,  _,  _,  _,  _, '#', _,  _,  _,  _,  _, '#', _,  _ ],
+        [ _,  _,  _, '#', _,  _, '#', _,  _, '#', _,  _,  _,  _,  _ ],
+        ['#', _,  _,  _,  _,  _,  _,  _,  _,  _,  _,  _, '#', _,  _ ],
+        [ _,  _,  _,  _,  _,  _,  _,  _, '#', _,  _,  _,  _,  _,  _ ],
+        [ _,  _,  _,  _,  _,  _,  _,  _, '#', _,  _,  _,  _,  _,  _ ],
+        [ _,  _,  _,  _,  _,  _,  _,  _,  _,  _, '#', _,  _,  _,  _ ],
+        [ _,  _,  _,  _,  _,  _,  _,  _,  _, '#', _,  _,  _,  _,  _ ]
     ],
     WordList = [
         % Horitzontal
-        [a, b, c, d, e],
-        [f, g, h, i, j, k, l, m, n],
-        [o, p, q, r, s],
-        [u, v, w, x, y, z, a],
-        [c, d, e],
-        [g, h, i, j, k, l, m],
-        [n, o, p, q, r],
-        [s, t, u],
-        [v, w, x, y, z],
-        [a, b, c, d, e],
-        [f, g, h, i, j, k, l, m, n],
-        [o, p],
-        [r, s, t, u, v, w],
-        [x, y],
-        [z, a],
-        [b, c, d, e, f, g, h, i, j],
-        [k, l, m, n, o],
-        [p, q, r, s, t, u, v, w],
-        [x, y],
-        [a, b],
-        [c, d, e, f],
-        [h, i],
-        [j, k],
-        [l, m, n, o, p, q, r, s],
-        [t, u, v, w, x],
-        [y, z, a],
-        [b, c, d, e, f],
-        [g, h, i, j, k],
-        [l, m],
-        [q, r],
-        [s, t, u],
-        [v, w, x, y, z],
-        [a, b, c, d, e],
-        [f, g, h],
-        [i, j, k, l, m],
-        [n, o, p, q, r],
-        [s, t],
-        [u, v, w, x, y, z],
+        [s, l, e, e, p, y],
+        [g, i, r, l, i, e],
+        [b, o, b],
+        [t, h, e],
+        [b, u, i, l, d, e, r],
+        [s, k, e, l, e, t, o, n],
+        [s, h, i, v, e, r],
+        [o, p, a, l],
+        [b, a, k, e, h],
+        [t, l, d, r],
+        [l, i, v, i, n, g],
+        [s, l, i, m, e],
+        [a, h],
+        [u, m, b, r, e, l, l, a],
+        [n, o, s, e, y],
+        [t, e, l, e, p, o, r, t],
+        [g, r, a, v, e, l],
+        [e, h],
+        [b, u, b, b, l, e],
+        [s, h, o, r, t],
+        [l, o, v, e, l, y],
+        [b, r, a, i, n],
+        [o, h],
+        [y, e, s],
+        [o, r],
+        [n, o],
+        [c, l, a, i, m],
+        [e, x, c, l, a, m, a, t, i, o, n],
+        [g, o],
+        [h, e, a, t, h, e, n, s],
+        [l, a, p, t, o, p],
+        [a, c, t, u, a, l, l, y],
+        [h, u, n, g, r, y],
+        [r, a, n, d, o, m, i, s, e, d],
+        [b, a, b, e],
+        [d, e, l, i, r, i, o, u, s],
+        [p, l, a, t, e],
         % Vertical
-        [a, o, b, n, a, o, x, k, x, h, t, g, p, a, n],
-        [b, p],
-        [o, b, p, y, l, y, i, u, h],
-        [b, o],
-        [c, q, c, p, c],
-        [v, i],
-        [c, p],
-        [d, r, d, q, d],
-        [z, n, a, j, w, j, q, d, q],
-        [e, s, e, r, e, q, a, o, b, k, x, k, r, e, r],
-        [f, t, f, s, f],
-        [b, p, c, l, y, l, s, f, s],
-        [t, g],
-        [c, q, d, m, z, m, t, g, t],
-        [h, u, g, u, h],
-        [d, r, e, n, a],
-        [u, h],
-        [i, v, h],
-        [i, r, e, s, f, o],
-        [j, w, i, v, j, s, f, t],
-        [p, b],
-        [v, i, v],
-        [k, x, j, w, k, t, g, u],
-        [q, c, o, w, j, w],
-        [l, y, k, x, l, u, h, v],
-        [r, d],
-        [x, k, x],
-        [m, z, l, y, m, v, i, w],
-        [s, e],
-        [y, l, y],
-        [n, a, m, z, n, w, j],
-        [z, m, z]
+        [a, b, s, o, l, u, t, e, l, y],
+        [h, a, r, d],
+        [o, k, p, i, m, e, h, o, e, e, e, c, a, e],
+        [s, b, e, a, v, b, l],
+        [v, s, x, a, t, n, l],
+        [l, l, i, r, e, b, e],
+        [c, t, u, d, i],
+        [e, t, e],
+        [n, e, p, u, l, o, l, h, a, o, r],
+        [e, h, t, b, g, l, o, b, y, r, a, e, l, m, i],
+        [p, e, o, a],
+        [l, r, b],
+        [m, n, l, i, o],
+        [n, k, s, a, t, l, b, n, a, s, y, s, u],
+        [e, l],
+        [e, r, o, t],
+        [e, s],
+        [g, u, s, h, i, n, g],
+        [i, l, h, d],
+        [i, i ,h],
+        [m, o, r, s, i, c, o, a, u],
+        [r, l, i, t, e, s, a, h, n, l, n, p, n, b, l],
+        [l, d, v, l],
+        [e, v, o],
+        [t, g, a, a],
+        [i, e, e, d, a, y, e, r, o, i, g, o, r, b, t],
+        [e, r, r, r, h],
+        [l, t, h, m, o, p, y, e, e]
     ],
-    puzzle_solution(Puzzle, WordList),
-    print_puzzle(Puzzle),
+    findall(Puzzle, puzzle_solution(Puzzle, WordList), Solutions),
+    maplist(print_puzzle, Solutions),
     ExpectedPuzzle = [
-        [ a,  b,  c,  d,  e, '#', f,  g,  h,  i,  j,  k,  l,  m,  n ],
-        [ o,  p,  q,  r,  s, '#', t, '#', u,  v,  w,  x,  y,  z,  a ],
-        [ b, '#', c,  d,  e, '#', f, '#', g,  h,  i,  j,  k,  l,  m ],
-        [ n,  o,  p,  q,  r, '#', s,  t,  u, '#', v,  w,  x,  y,  z ],
-        [ a,  b,  c,  d,  e, '#', f,  g,  h,  i,  j,  k,  l,  m,  n ],
-        [ o,  p, '#','#', q, '#','#','#','#', r,  s,  t,  u,  v,  w ],
-        [ x,  y, '#', z,  a, '#', b,  c,  d,  e,  f,  g,  h,  i,  j ],
-        [ k,  l,  m,  n,  o, '#', p,  q,  r,  s,  t,  u,  v,  w, '#'],
-        [ x,  y, '#', a,  b, '#', c,  d,  e,  f, '#','#','#','#','#'],
-        [ h,  i, '#', j,  k, '#', l,  m,  n,  o,  p,  q,  r,  s, '#'],
-        [ t,  u,  v,  w,  x, '#', y,  z,  a, '#', b,  c,  d,  e,  f ],
-        [ g,  h,  i,  j,  k, '#', l,  m, '#','#','#', o, '#','#','#'],
-        [ p, '#','#', q,  r, '#', s,  t,  u, '#', v,  w,  x,  y,  z ],
-        [ a,  b,  c,  d,  e, '#', f,  g,  h, '#', i,  j,  k,  l,  m ],
-        [ n,  o,  p,  q,  r, '#', s,  t, '#', u,  v,  w,  x,  y,  z ]
+        [ a, '#', s,  l,  e,  e,  p,  y, '#', g,  i,  r,  l,  i,  e ],
+        [ b,  o,  b, '#', t,  h,  e, '#', b,  u,  i,  l,  d,  e,  r ],
+        [ s,  k,  e,  l,  e,  t,  o,  n, '#', s,  h,  i,  v,  e,  r ],
+        [ o,  p,  a,  l, '#', b,  a,  k,  e,  h, '#', t,  l,  d,  r ],
+        [ l,  i,  v,  i,  n,  g, '#', s,  l,  i,  m,  e, '#', a,  h ],
+        [ u,  m,  b,  r,  e,  l,  l,  a, '#', n,  o,  s,  e,  y, '#'],
+        [ t,  e,  l,  e,  p,  o,  r,  t, '#', g,  r,  a,  v,  e,  l ],
+        [ e,  h, '#', b,  u,  b,  b,  l,  e, '#', s,  h,  o,  r,  t ],
+        [ l,  o,  v,  e,  l,  y, '#', b,  r,  a,  i,  n, '#', o,  h ],
+        [ y,  e,  s, '#', o,  r, '#', n,  o, '#', c,  l,  a,  i,  m ],
+        ['#', e,  x,  c,  l,  a,  m,  a,  t,  i,  o,  n, '#', g,  o ],
+        [ h,  e,  a,  t,  h,  e,  n,  s, '#', l,  a,  p,  t,  o,  p ],
+        [ a,  c,  t,  u,  a,  l,  l,  y, '#', h,  u,  n,  g,  r,  y ],
+        [ r,  a,  n,  d,  o,  m,  i,  s,  e,  d, '#', b,  a,  b,  e ],
+        [ d,  e,  l,  i,  r,  i,  o,  u,  s, '#', p,  l,  a,  t,  e ]
     ],
-    assertion(Puzzle == ExpectedPuzzle),
     debug(puzzle, '>>> 15x15 PUZZLE TEST PASSED <<<', []).
 
 :- end_tests(puzzle_solution).
