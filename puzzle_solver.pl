@@ -4,23 +4,24 @@
 
 /*********************************************************************
  * Author:   Justin Lee <justinlee@student.unimelb.edu.au>
- * Purpose:  Crossword puzzle solver for automatic filling of crossword
- *           grids using a dictionary of words
+ * Purpose:  Fill-in Puzzle Solver that given a crossword grid and a 
+ *           word list, fills the grid with the words from the list.
  *
- * This module provides a solution to crossword puzzles by placing words
- * from a given word list into a crossword grid. The algorithm uses a
- * dynamic "most constrained slot first" approach to efficiently search
- * for a solution, making it more effective than naive approaches.
+ * This module provides a solution to crossword puzzles by leveraging
+ * a dynamic algorithm approach known as Minimum Remaining Values (MRV)
+ * heuristic — also known as the "most constrained variable first" 
+ * strategy. In essence, the algorithm identifies the slot with the fewest
+ * possible candidates and attempts to fill it first.
  *
  * Input:
  *   Puzzle = list-of-lists representing the grid, where:
  *     - '#' represents a blocked cell
  *     - A letter represents a pre-filled cell
- *     - A variable (var(_)) represents an empty cell to be filled
+ *     - An unbound variable (_) represents an empty cell to be filled
  *   WordList = list of words, each word is a list of letters
  *
  * Output:
- *   The Puzzle with all empty cells filled with letters from WordList
+ *   The Puzzle with all empty cells filled with letters from the WordList
  *********************************************************************/
 
 /*********************************************************************
@@ -501,7 +502,15 @@ place_word_in_slot(Puzzle, slot(O,L,[(R,C)|Coords]), [Letter|Rest]) :-
     ),
     place_word_in_slot(Puzzle, slot(O,L,Coords), Rest).
 
-
+/*********************************************************************
+ * print_puzzle/1
+ * Prints the completed puzzle to the console
+ *
+ * Arguments:
+ *   Puzzle: The crossword grid to print
+ *
+ * This is a simple utility to visualize the filled puzzle.
+ *********************************************************************/
 print_puzzle(Puzzle) :-
     debug(puzzle, 'Completed Puzzle:', []),
     maplist(print_row, Puzzle).
