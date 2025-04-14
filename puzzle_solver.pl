@@ -840,7 +840,8 @@ test(fifteen_by_fifteen, true(Solutions = [ExpectedPuzzle])) :-
         [e, r, r, r, h],
         [l, t, h, m, o, p, y, e, e]
     ],
-    findall(Puzzle, puzzle_solution(Puzzle, WordList), Solutions),
+    copy_term(Puzzle, Sol),
+    findall(Sol, puzzle_solution(Sol, WordList), Solutions),
     maplist(print_puzzle, Solutions),
     ExpectedPuzzle = [
         [ a, '#', s,  l,  e,  e,  p,  y, '#', g,  i,  r,  l,  i,  e ],
