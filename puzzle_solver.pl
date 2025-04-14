@@ -19,11 +19,11 @@
  *   - Words in the WordList must have at least two letters.
  *   - Valid slots must be at least two cells long.
  *
- * The algorithm proceeds as follows:
- *   1) Create a dictionary that groups words by their lengths.
- *   2) Extract all horizontal and vertical slots of length ≥ 2.
- *   3) Recursively fill the puzzle using a constraint-driven search,
- *      always selecting the most constrained slot first (MRV heuristic).
+ * Strategy:
+ *   - Create a dictionary that groups words by their lengths.
+ *   - Extract all horizontal and vertical slots of length ≥ 2.
+ *   - Recursively fill the puzzle using a constraint-driven search,
+ *     always selecting the most constrained slot first (MRV heuristic).
  *
  * Note:
  *   - Once a word is placed in a slot, remove it from the dictionary
@@ -355,7 +355,8 @@ swap_col_row_to_row_col((C,R),(R,C)).
  * - If no more slots => check dictionary is empty => success or fail.
  * - Else pick the "most constrained slot" => minimal # of candidate words.
  * - For each candidate word:
- *     place it, remove from dict, recurse. On failure => backtrack.
+ *     - place it, remove from dict, recurse. 
+ *     - on failure => backtrack.
  *********************************************************************/
 fill_puzzle(_Puzzle, [], WordDict) :-
     (   WordDict == [] 
@@ -371,47 +372,54 @@ fill_puzzle(Puzzle, Slots, WordDict) :-
 
 /*********************************************************************
  * pick_most_constrained_slot/5
- * pick_most_constrained_slot(+Puzzle, +Slots, +WordDict, -Slot, -OtherSlots)
+ * pick_most_constrained_slot(+Puzzle, +Slots, +WordDict, -SelectedSlot, -OtherSlots)
  * Evaluate candidate count for each slot => pick the one with min #.
  *
  * Arguments:
  *   Puzzle: The crossword grid
  *   Slots: List of slots to evaluate
  *   WordDict: Dictionary of available words
- *   Slot: Selected slot with fewest candidates
+ *   SelectedSlot: Selected slot with fewest candidates
  *   OtherSlots: Remaining slots (excluding the selected one)
  *
  * Strategy:
-    * - For each slot, evaluate the number of candidates.
-    *   - Pick the slot with the fewest candidates.
+ * - First calculate the number of candidates for the first slot.
+ * - Recursively check the rest of the slots with the helper predicate.
+ * - Return the selected slot and the remaining slots.
+ * - Remove that selected slot from the list of slots (as it is now in-use).
  *********************************************************************/
-pick_most_constrained_slot(Puzzle, [S|Ss], WordDict, Slot, OtherSlots) :-
-    /* Evaluate # of candidates for S. */
-    candidates_for_slot(Puzzle, S, WordDict, CandS),
-    length(CandS, CountS),
-    pick_most_constrained_slot_aux(Puzzle, Ss, WordDict, S, CountS, Slot),
-    /* Remove that Slot from the big list => OtherSlots is the rest. */
-    delete([S|Ss], Slot, OtherSlots).
+pick_most_constrained_slot(Puzzle, [Slot|Slots], WordDict, SelectedSlot, OtherSlots) :-
+    candidates_for_slot(Puzzle, Slot, WordDict, Candidates),
+    length(Candidates, NumberOfCandidates),
+    pick_most_constrained_slot_aux(Puzzle, Slots, WordDict, Slot, NumberOfCandidates, SelectedSlot),
+    delete([Slot|Slots], SelectedSlot, OtherSlots).
 
 /*********************************************************************
  * pick_most_constrained_slot_aux/6
+ * pick_most_constrained_slot_aux(+Puzzle, +Slots, +WordDict, +BestSlotSoFar,
+ *                                +LowestCount, -FinalSlot)
  * Helper to find the slot with the fewest candidate words
  *
  * Arguments:
  *   Puzzle: The crossword grid
  *   Slots: Remaining slots to check
- *   WDict: Dictionary of available words
+ *   WordDict: Dictionary of available words
  *   BestSlotSoFar: Best slot found so far
- *   BestCount: Number of candidates for best slot so far
+ *   LowestCount: Number of candidates for best slot so far (lower is better)
  *   FinalSlot: Final selected slot (output)
+ *
+ * Base Case: After recursing through all slots, return the best slot
+ *      BestSlotSoFar is returned as the final slot.
+ * Valid Case: If the current slot has fewer candidates than the best
+ *      slot so far, update the best slot and continue searching.
  *********************************************************************/
 pick_most_constrained_slot_aux(_Puzzle, [], _WDict, Slot, _Count, Slot).
-pick_most_constrained_slot_aux(Puzzle, [S2|Ss], WDict, BestSlotSoFar, BestCount, FinalSlot) :-
-    candidates_for_slot(Puzzle, S2, WDict, Cand2),
-    length(Cand2, Count2),
-    ( Count2 < BestCount ->
-        pick_most_constrained_slot_aux(Puzzle, Ss, WDict, S2, Count2, FinalSlot)
-    ; pick_most_constrained_slot_aux(Puzzle, Ss, WDict, BestSlotSoFar, BestCount, FinalSlot)
+pick_most_constrained_slot_aux(Puzzle, [CurrentSlot|Slots], WordDict, BestSlotSoFar, LowestCount, FinalSlot) :-
+    candidates_for_slot(Puzzle, CurrentSlot, WordDict, CurrentCandidates),
+    length(CurrentCandidates, CurrentCount),
+    ( CurrentCount < LowestCount ->
+        pick_most_constrained_slot_aux(Puzzle, Slots, WordDict, CurrentSlot, CurrentCount, FinalSlot)
+    ; pick_most_constrained_slot_aux(Puzzle, Slots, WordDict, BestSlotSoFar, LowestCount, FinalSlot)
     ).
 
 /*********************************************************************
@@ -582,23 +590,33 @@ place_word_in_slot(Puzzle, slot(O,L,[(RowIndex,ColIndex)|Coords]), [Letter|Rest]
  *   DictOut: Dictionary after removal
  *
  * If that bucket becomes empty afterwards, remove that pair entirely.
+ *
+ * Base Case: Failsafe, as the dictionary should always contain the word
+ *      being removed.
+ * Valid Case: If the length matches, remove the word from that bucket
+ *      and return an updated dictionary.
+ * Valid Case: If the length matches and there is only one word left
+ *      in that bucket, remove the entire bucket.
+ * Invalid Case: If the length does not match, continue searching.
  *********************************************************************/
-remove_word_from_dict([], _L, _Word, []) :- 
-    /* Should not happen if we keep consistent usage. */
+% Base Case; Empty dictionary => fail
+remove_word_from_dict([], _WordLength, _Word, []) :- 
     fail.
 
-remove_word_from_dict([Len-Words|Rest], L, Word, [Len-NewWords|Rest]) :-
-    L == Len, 
-    select(Word, Words, NewWords), 
-    NewWords \= [], 
+% Valid Case; WordLength matches, but there are still words left
+remove_word_from_dict([Len-Words|Rest], WordLength, Word, [Len-NewWords|Rest]) :-
+    WordLength == Len,
+    select(Word, Words, NewWords),
+    NewWords \= [],
     !.
 
-remove_word_from_dict([Len-[Word]|Rest], L, Word, Rest) :-
-    /* If removing Word from that single-element bucket => remove bucket. */
-    L == Len, !.
+% Valid Case; WordLength matches, but this is the last word in the bucket
+remove_word_from_dict([Len-[Word]|Rest], WordLength, Word, Rest) :-
+    WordLength == Len, !.
 
-remove_word_from_dict([Pair|Rest], L, W, [Pair|NewRest]) :-
-    remove_word_from_dict(Rest, L, W, NewRest).
+% Invalid Case; WordLength does not match, continue searching
+remove_word_from_dict([Pair|Rest], WordLength, W, [Pair|NewRest]) :-
+    remove_word_from_dict(Rest, WordLength, W, NewRest).
 
 /*********************************************************************
  * print_puzzle/1
@@ -625,8 +643,10 @@ print_row(Row) :-
  * Test cases are written to expect at most one solution.
 
  * Debugging is forcibly enabled by default for all tests
+ * via set_test_options([output(always)]) and setup(debug(puzzle)).
  *********************************************************************/
 :- begin_tests(puzzle_solution, [setup(debug(puzzle))]).
+:- set_test_options([output(always)]).
 
 /* Test Case 1: example */  
 test(example, true(Solutions = [ExpectedPuzzle])) :-
