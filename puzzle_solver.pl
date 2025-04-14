@@ -13,112 +13,121 @@
  * strategy. In essence, the algorithm identifies the slot with the fewest
  * possible candidates and attempts to fill it first.
  *
- * Input:
- *   Puzzle = list-of-lists representing the grid, where:
- *     - '#' represents a blocked cell
- *     - A letter represents a pre-filled cell
- *     - An unbound variable (_) represents an empty cell to be filled
- *   WordList = list of words, each word is a list of letters
+ * Key Constraints:
+ *   - Each word from the WordList must be used exactly once.
+ *   - All pre-filled letters must be respected.
+ *   - Words in the WordList must have at least two letters.
+ *   - Valid slots must be at least two cells long.
+ *
+ * The algorithm proceeds as follows:
+ *   1) Create a dictionary that groups words by their lengths.
+ *   2) Extract all horizontal and vertical slots of length ≥ 2.
+ *   3) Recursively fill the puzzle using a constraint-driven search,
+ *      always selecting the most constrained slot first (MRV heuristic).
+ *
+ * Note:
+ *   - Once a word is placed in a slot, remove it from the dictionary
+ *     and proceed to fill the remaining slots.
+ *   - If a slot cannot be filled, backtrack and try the next candidate.
+ *   - The puzzle is considered solved when all slots are successfully filled
+ *     and the WordList is empty.
  *
  * Output:
- *   The Puzzle with all empty cells filled with letters from the WordList
+ *   The Puzzle with all empty cells filled using words from the WordList.
  *********************************************************************/
 
 /*********************************************************************
  * puzzle_solution/2
- *
+ * puzzle_solution(+Puzzle, +WordList)
  * The main entry point of the crossword solver.
  *
  * Arguments:
- *   Puzzle    : A list of lists representing the crossword grid.
- *               Each cell is either:
- *                 - '#' (a blocked cell),
- *                 - a lowercase letter (a pre-filled cell), or
- *                 - an unbound variable (_) representing an empty cell.
- *   WordList  : A list of words, where each word is a list of lowercase letters.
- *
- * Workflow:
- *   1) Constructs a dictionary mapping word lengths to word lists.
- *   2) Extracts all fillable horizontal and vertical slots from the grid.
- *   3) Applies a constraint-driven, recursive search to fill the puzzle,
- *      always selecting the most constrained slot (fewest valid candidates).
- *
- * Constraints:
- *   - Each word in the WordList must be used exactly once.
- *   - The filled puzzle must be consistent with any pre-filled letters.
+ *   Puzzle: A list-of-lists representing the crossword grid.
+ *           Each cell is one of:
+ *              - '#' (a blocked cell),
+ *              - a lowercase letter (a pre-filled cell), or
+ *              - an unbound variable (_) representing an empty cell.
+ *   WordList: list of words, each word is a list of lowercase letters.
  *********************************************************************/
 puzzle_solution(Puzzle, WordList) :-
-    /* 1) Build dictionary of words by length. */
     build_word_dict(WordList, WordDict0),
-    
-    /* 2) Extract all slots (>= 2 in length). */
     extract_all_slots(Puzzle, Slots),
-    
-    /* 3) Solve by dynamically picking the most constrained slot first. */
     fill_puzzle(Puzzle, Slots, WordDict0).
 
 /*********************************************************************
  * build_word_dict/2
- * Build a map (list of length->words) from the given WordList.
+ * build_word_dict(+WordList, -WordDict)
+ * Create a dictionary list of pairs (Length-[Words]) from the given WordList.
  *
  * Arguments:
- *   WordList: The list of words to organize
+ *   WordList: The list of words to organise
  *   WordDict: The resulting dictionary as a list of pairs (Length-[Words])
  *
  * Example: If WordList = [[c,a,t],[b,a,g],[i,t],[i,f]]
- *   Then WordDict might be:
+ *   Then WordDict will be:
  *   [
- *     2 -> [[i,t],[i,f]],
- *     3 -> [[c,a,t],[b,a,g]]
+ *     2-[[i,t],[i,f]],
+ *     3-[c,a,t],[b,a,g]]
  *   ]
  *
- * Implementation detail:
- *   We store it as a list of pairs: [ length-words, ... ].
- *   We can look up by length with 'get_words_of_length/3'.
+ * Note:
+ *   - We can later look up candidate words by length with
+ *     'get_words_of_length/3'.
  *********************************************************************/
 build_word_dict(WordList, WordDict) :-
-    /* Group words by length using an accumulator approach. */
-    group_words_by_length(WordList, [], WordDictUnsorted),
-    /* Sort the dictionary by length ascending (not crucial, but neat). */
-    sort(WordDictUnsorted, WordDict).
+    group_words_by_length(WordList, [], WordDict),
+    debug(puzzle, 'Word Dictionary: ~w', [WordDict]).
 
 /*********************************************************************
  * group_words_by_length/3
+ * group_words_by_length(+WordList, +Acc, -Out)
  * Groups words by their length recursively
  *
  * Arguments:
- *   WordList: Remaining words to be processed
+ *   WordList: Remaining words to be processed, 
+               Split into Word and RemainingWords
  *   Acc: Accumulator of grouped words so far
  *   Out: Final grouped dictionary
+ *
+ * Base Case: When WordList is empty, return the accumulated dictionary.
  *********************************************************************/
 group_words_by_length([], Acc, Acc).
-group_words_by_length([W|Ws], Acc, Out) :-
-    length(W, L),
-    /* Insert W into the bucket for length L. */
-    insert_word_in_dict(L, W, Acc, Acc2),
-    group_words_by_length(Ws, Acc2, Out).
+group_words_by_length([Word|RemainingWords], Acc, Out) :-
+    length(Word, WordLength),
+    debug(puzzle, 'Processing word: ~w (Length: ~w)', [Word, WordLength]),
+    insert_word_in_dict(WordLength, Word, Acc, Acc2),
+    group_words_by_length(RemainingWords, Acc2, Out).
 
 /*********************************************************************
  * insert_word_in_dict/4
+ * insert_word_in_dict(+WordLength, +Word, +DictIn, -DictOut)
  * Inserts a word into the appropriate length bucket in the dictionary
  *
  * Arguments:
- *   L: Length of the word
- *   W: The word to insert
+ *   WordLength: Length of the word
+ *   Word: The word to insert
  *   DictIn: Input dictionary
  *   DictOut: Dictionary after insertion
  *
- * If there's a pair (L->List), we add W to that list,
- * else we create a new pair.
+ * Base Case: For a new word length, create a new length-bucket
+ *      WordLength-[Word] in the dictionary.
+ * Matching Length: If the word length matches an existing bucket,
+ *      add the word to that bucket.
+ * Different Length: If the word length does not match, recurse
  *********************************************************************/
-insert_word_in_dict(L, W, [], [L-[W]]) :- !.
-insert_word_in_dict(L, W, [Len-Words|Rest], [Len-[W|Words]|Rest]) :-
-    L == Len, !.
-insert_word_in_dict(L, W, [Pair|Rest], [Pair|NewRest]) :-
-    insert_word_in_dict(L, W, Rest, NewRest).
+insert_word_in_dict(WordLength, Word, [], [WordLength-[Word]]) :- 
+    debug(puzzle, 'Creating new bucket for length ~w with word ~w', [WordLength, Word]),
+    !.
+insert_word_in_dict(WordLength, Word, [Len-Words|Rest], [Len-[Word|Words]|Rest]) :-
+    WordLength == Len,
+    debug(puzzle, 'Inserting word ~w into bucket of length ~w', [Word, WordLength]),    
+    !.
+insert_word_in_dict(WordLength, Word, [Pair|Rest], [Pair|NewRest]) :-
+    insert_word_in_dict(WordLength, Word, Rest, NewRest).
 
 /*********************************************************************
  * extract_all_slots/2
+ * extract_all_slots(+Puzzle, -AllSlots)
  * Gathers horizontal & vertical runs (>=2) of open cells.
  *
  * Arguments:
@@ -127,26 +136,35 @@ insert_word_in_dict(L, W, [Pair|Rest], [Pair|NewRest]) :-
  *
  * A slot is represented as slot(Orientation, Length, Coordinates)
  * where Orientation is 'horizontal' or 'vertical', Length is the
- * number of cells, and Coordinates is a list of (Row,Col) pairs.
+ * number of cells, and Coordinates is a list of (Row,Col) pairs
+ * where the top-left corner of the grid as (0,0).
  *********************************************************************/
 extract_all_slots(Puzzle, AllSlots) :-
-    debug(puzzle, 'Extracting slots...', []),
-    extract_horizontal_slots(Puzzle, HSlots),
-    debug(puzzle, 'Horizontal slots: ~w', [HSlots]),
-    extract_vertical_slots(Puzzle, VSlots),
-    debug(puzzle, 'Vertical slots: ~w', [VSlots]),
-    append(HSlots, VSlots, AllSlots),
-    debug(puzzle, 'All slots: ~w', [AllSlots]).
+    extract_horizontal_slots(Puzzle, HorizontalSlots),
+    debug(puzzle, 'Horizontal Slots: ~w', [HorizontalSlots]),
+    extract_vertical_slots(Puzzle, VerticalSlots),
+    debug(puzzle, 'Vertical Slots: ~w', [VerticalSlots]),
+    append(HorizontalSlots, VerticalSlots, AllSlots).
 
 /*********************************************************************
  * extract_horizontal_slots/2
+ * extract_horizontal_slots(+Puzzle, -HorizontalSlots)
  * Finds all horizontal slots in the puzzle
  *
  * Arguments:
  *   Puzzle: The crossword grid
- *   HSlots: List of horizontal slots found
+ *   HorizontalSlots: List of horizontal slots found
+ *
+ * Run 'row_to_slots/3' for each row in the grid to find all
+ * horizontal slots.
+ *
+ * SlotsPerRow is a list of lists, where each sublist contains
+ * the slots found in that row.
+ *
+ * The final result is a flattened list of all horizontal slots, this
+ * ensures that the output only contains slots and no empty lists.
  *********************************************************************/
-extract_horizontal_slots(Puzzle, HSlots) :-
+extract_horizontal_slots(Puzzle, HorizontalSlots) :-
     length(Puzzle, NumRows),
     debug(puzzle, 'Number of rows in puzzle: ~w', [NumRows]),
     NumRowsMinus1 is NumRows - 1,
@@ -159,10 +177,12 @@ extract_horizontal_slots(Puzzle, HSlots) :-
       ),
       SlotsPerRow),
 
-    flatten(SlotsPerRow, HSlots).
+    debug(puzzle, 'Slots per row: ~w', [SlotsPerRow]),
+    flatten(SlotsPerRow, HorizontalSlots).
 
 /*********************************************************************
  * row_to_slots/3
+ * row_to_slots(+RowList, +RowIndex, -RowSlots)
  * Converts a row to a list of horizontal slots
  *
  * Arguments:
@@ -172,46 +192,62 @@ extract_horizontal_slots(Puzzle, HSlots) :-
  *********************************************************************/
 row_to_slots(RowList, RowIndex, RowSlots) :-
     collect_runs(RowList, 0, Runs),
+    debug(puzzle, 'Runs found in row ~w: ~w', [RowIndex, Runs]),
     make_horizontal_slots(Runs, RowIndex, RowSlots).
 
 /*********************************************************************
  * collect_runs/3
+ * collect_runs(+List, +Col, -Runs)
  * Collects consecutive runs of non-blocked cells in a row
  *
  * Arguments:
  *   List: List of cells to process
  *   Col: Current column position
  *   Runs: List of runs found, each run is a list of column indices
+ *
+ * Base Case: After processing all cells, return empty list.
+ * Blocked Cell: If a blocked cell is encountered, skip it and
+ *      continue to the next cell.
+ * Consecutive Cell: If an open cell is found, collect it and
+ *      continue to collect consecutive cells until a blocked cell
+ *      is encountered.
  *********************************************************************/
 collect_runs([], _, []).
 collect_runs([Cell|T], Col, Runs) :-
     Cell == '#',  % blocked => skip
     debug(puzzle, 'Blocked cell at column ~w', [Col]),
-    Col1 is Col + 1,
-    collect_runs(T, Col1, Runs).
+    NextCol is Col + 1,
+    collect_runs(T, NextCol, Runs).
 
-collect_runs([Cell|T], Col, [[Col|MoreCols] | OtherRuns]) :-
+collect_runs([Cell|T], Col, [[Col|Cols] | OtherRuns]) :-
     Cell \== '#',  % open cell
     debug(puzzle, 'Open cell at column ~w', [Col]),
-    ColPlusOne is Col + 1,
-    collect_consecutive(T, ColPlusOne, MoreCols, Remainder),
-    length(MoreCols, RunLength),
-    % ColPlusOne is the starting column of the consecutive run
+    ConsecutiveCol is Col + 1,
+    collect_consecutive(T, ConsecutiveCol, Cols, Remainder),
+    length(Cols, RunLength),
+    % ConsecutiveCol is the starting column of the consecutive run
     % RunLength is the length of the consecutive run
     % + 1 for the next column after the consecutive run terminates
-    NextCol is ColPlusOne + RunLength + 1,
+    NextCol is ConsecutiveCol + RunLength + 1,
     debug(puzzle, 'Next column to check: ~w', [NextCol]),
     collect_runs(Remainder, NextCol, OtherRuns).
 
 /*********************************************************************
  * collect_consecutive/4
+ * collect_consecutive(+List, +Col, -Cols, -Remainder)
  * Collects consecutive non-blocked cells
  *
  * Arguments:
  *   List: List of cells to process
  *   Col: Current column position
- *   MoreCols: Additional column indices in this run
+ *   Cols: Additional column indices in this run
  *   Remainder: Remaining cells after this run
+ *
+ * Base Case: After processing all cells, return empty list.
+ * Blocked Cell: If a blocked cell is encountered, skip it and
+ *      return the remaining cells.
+ * Consecutive Cell: If an open cell is found, collect it and
+ *      continue to collect consecutive cells until a blocked cell
  *********************************************************************/
 collect_consecutive([], _Col, [], []).
 collect_consecutive([Cell|T], Col, [], T) :-
@@ -221,11 +257,12 @@ collect_consecutive([Cell|T], Col, [], T) :-
 collect_consecutive([Cell|T], Col, [Col|More], Remainder) :-
     Cell \== '#',
     debug(puzzle, 'Consecutive cell at column ~w', [Col]),
-    Col1 is Col + 1,
-    collect_consecutive(T, Col1, More, Remainder).
+    NextCol is Col + 1,
+    collect_consecutive(T, NextCol, More, Remainder).
 
 /*********************************************************************
  * make_horizontal_slots/3
+ * make_horizontal_slots(+RunCols, +Row, -Slots)
  * Converts runs of column indices to horizontal slots
  *
  * Arguments:
@@ -234,6 +271,11 @@ collect_consecutive([Cell|T], Col, [Col|More], Remainder) :-
  *   Slots: List of slots created
  *
  * Only creates slots for runs with length >= 2
+ *
+ * Base Case: If no runs left, return empty list.
+ * Valid Run: If the run has length >= 2, create a slot
+ *      with the coordinates of the cells in that run.
+ * Invalid Run: If the run has length < 2, skip it.
  *********************************************************************/
 make_horizontal_slots([], _, []).
 make_horizontal_slots([RunCols|T], Row, [slot(horizontal,Len,Coords)|Slots]) :-
@@ -248,85 +290,60 @@ make_horizontal_slots([RunCols|T], Row, Slots) :-
 
 /*********************************************************************
  * extract_vertical_slots/2
+ * extract_vertical_slots(+Puzzle, -VerticalSlots)
  * Finds all vertical slots in the puzzle by transposing the grid
  *
  * Arguments:
  *   Puzzle: The crossword grid
- *   VSlots: List of vertical slots found
+ *   VerticalSlots: List of vertical slots found
+ *
+ * Re-purposes the horizontal slot extraction code by transposing
+ * the grid first. This allows us to treat vertical slots as
+ * horizontal slots in the transposed grid.
+ *
+ * Finally fixes the coordinates back to the original grid by 
+ * swapping the row and column indices.
  *********************************************************************/
-extract_vertical_slots(Puzzle, VSlots) :-
-    transpose(Puzzle, TGrid),
-    extract_horizontal_slots(TGrid, TempHSlots),
-    fix_transposed_coords(TempHSlots, VSlots).
+extract_vertical_slots(Puzzle, VerticalSlots) :-
+    transpose(Puzzle, TransposedGrid),
+    extract_horizontal_slots(TransposedGrid, TempHSlots),
+    fix_transposed_coords(TempHSlots, VerticalSlots).
 
 /*********************************************************************
  * fix_transposed_coords/2
+ * fix_transposed_coords(+TempHSlots, -VerticalSlots)
  * Converts horizontal slots in transposed grid to vertical slots
  *
  * Arguments:
  *   TempHSlots: Horizontal slots in transposed grid
- *   VSlots: Resulting vertical slots in original grid
+ *   VerticalSlots: Resulting vertical slots in original grid
+ *
+ * TC represents the transposed coordinates of the slots (Col,Row)
+ * OC represents the output coordinates of the slots (Row,Col)
+ * 
+ * Base Case: If no more slots left, return empty list.
+ * Valid Slot: For each slot, swap the row and column indices
+ * and the slot orientation.
  *********************************************************************/
 fix_transposed_coords([], []).
 fix_transposed_coords([slot(horizontal,Len,TC)|T],[slot(vertical,Len,OC)|T2]) :-
-    maplist(swap_rc, TC, OC),
+    maplist(swap_col_row_to_row_col, TC, OC),
     fix_transposed_coords(T, T2).
 
 /*********************************************************************
- * swap_rc/2
- * Swaps row and column coordinates
+ * swap_col_row_to_row_col/2
+ * swap_col_row_to_row_col(+CR, -RC)
+ * Swaps column-row coordinates to row-column coordinates
  *
  * Arguments:
- *   (R,C): Input row-column pair
- *   (C,R): Output column-row pair (swapped)
+ *   (C,R): Input column-row pair (transposed)
+ *   (R,C): Output row-column pair (original grid)
  *********************************************************************/
-swap_rc((R,C),(C,R)).
-
-/*********************************************************************
- * get_words_of_length/3
- * Retrieve the list of words for 'Length' from the dictionary.
- *
- * Arguments:
- *   Dict: The word dictionary
- *   L: Length of words to retrieve
- *   WordsList: List of words of length L (empty if none found)
- *********************************************************************/
-get_words_of_length([], _L, []).
-get_words_of_length([Len-Words|_], L, Words) :- L == Len, !.
-get_words_of_length([_|Rest], L, Words) :-
-    get_words_of_length(Rest, L, Words).
-
-/*********************************************************************
- * remove_word_from_dict/4
- * Remove 'Word' from the dictionary bucket for 'Length'.
- *
- * Arguments:
- *   DictIn: Input dictionary
- *   L: Length of the word
- *   Word: The word to remove
- *   DictOut: Dictionary after removal
- *
- * If that bucket becomes empty afterwards, remove that pair entirely.
- *********************************************************************/
-remove_word_from_dict([], _L, _Word, []) :- 
-    /* Should not happen if we keep consistent usage. */
-    fail.
-
-remove_word_from_dict([Len-Words|Rest], L, Word, [Len-NewWords|Rest]) :-
-    L == Len, 
-    select(Word, Words, NewWords), 
-    NewWords \= [], 
-    !.
-
-remove_word_from_dict([Len-[Word]|Rest], L, Word, Rest) :-
-    /* If removing Word from that single-element bucket => remove bucket. */
-    L == Len, !.
-
-remove_word_from_dict([Pair|Rest], L, W, [Pair|NewRest]) :-
-    remove_word_from_dict(Rest, L, W, NewRest).
+swap_col_row_to_row_col((C,R),(R,C)).
 
 /*********************************************************************
  * fill_puzzle/3
+ * fill_puzzle(+Puzzle, +Slots, +WordDict)
  * Core solving algorithm that fills the puzzle with words
  *
  * Arguments:
@@ -341,22 +358,20 @@ remove_word_from_dict([Pair|Rest], L, W, [Pair|NewRest]) :-
  *     place it, remove from dict, recurse. On failure => backtrack.
  *********************************************************************/
 fill_puzzle(_Puzzle, [], WordDict) :-
-    /* If no more slots, we succeed only if no leftover words remain. */
-    ( WordDict == [] ->
-        debug(puzzle, 'All slots filled successfully!', []),
+    (   WordDict == [] 
+    ->  debug(puzzle, 'All slots filled successfully!', []),
         !
-        ; debug(puzzle, 'Leftover words in dictionary:', [WordDict]),
+    ;   debug(puzzle, 'Leftover words in dictionary: ~w', [WordDict]),
         fail
     ).
 
 fill_puzzle(Puzzle, Slots, WordDict) :-
-    /* 1) Pick the slot with the fewest candidate words => "most constrained" */
     pick_most_constrained_slot(Puzzle, Slots, WordDict, Slot, OtherSlots),
-    /* 2) Attempt each candidate word in turn. */
     try_fill_slot_with_candidates(Puzzle, Slot, OtherSlots, WordDict).
 
 /*********************************************************************
  * pick_most_constrained_slot/5
+ * pick_most_constrained_slot(+Puzzle, +Slots, +WordDict, -Slot, -OtherSlots)
  * Evaluate candidate count for each slot => pick the one with min #.
  *
  * Arguments:
@@ -365,6 +380,10 @@ fill_puzzle(Puzzle, Slots, WordDict) :-
  *   WordDict: Dictionary of available words
  *   Slot: Selected slot with fewest candidates
  *   OtherSlots: Remaining slots (excluding the selected one)
+ *
+ * Strategy:
+    * - For each slot, evaluate the number of candidates.
+    *   - Pick the slot with the fewest candidates.
  *********************************************************************/
 pick_most_constrained_slot(Puzzle, [S|Ss], WordDict, Slot, OtherSlots) :-
     /* Evaluate # of candidates for S. */
@@ -396,28 +415,94 @@ pick_most_constrained_slot_aux(Puzzle, [S2|Ss], WDict, BestSlotSoFar, BestCount,
     ).
 
 /*********************************************************************
+ * try_fill_slot_with_candidates/4
+ * try_fill_slot_with_candidates(+Puzzle, +Slot, +OtherSlots, +WordDict)
+ * Attempt each candidate word in turn. If all fail => backtrack.
+ *
+ * Arguments:
+ *   Puzzle: The crossword grid
+ *   Slot: The slot to fill
+ *   OtherSlots: Remaining slots to fill
+ *   WordDict: Dictionary of available words
+ *
+ * Starategy:
+ *   - Get all candidates for this slot.
+ *   - If no candidates => fail.
+ *   - For each candidate:
+ *       - Place the word in the slot.
+ *       - Remove the word from the dictionary.
+ *       - Recurse to fill the rest of the slots.
+ *       - If that fails, backtrack and try the next candidate.
+ *   - If all candidates fail, backtrack to the previous slot.
+ *   - If all slots are filled successfully, return the filled puzzle.
+ *********************************************************************/
+try_fill_slot_with_candidates(Puzzle, Slot, OtherSlots, WordDict) :-
+    candidates_for_slot(Puzzle, Slot, WordDict, Candidates),
+    ( Candidates = [] ->
+        debug(puzzle, 'No candidates for slot ~w => fail', [Slot]),
+        fail
+    ; true ),
+    % member is non-deterministic => backtrack on failure. 
+    member(Word, Candidates),
+
+    debug(puzzle, 'Trying to place word ~w in slot ~w', [Word, Slot]),
+    place_word_in_slot(Puzzle, Slot, Word),
+
+    % Retrieve the length of the slot that the word was placed in
+    Slot = slot(_, WordLength, _),
+    remove_word_from_dict(WordDict, WordLength, Word, WordDict2),
+    fill_puzzle(Puzzle, OtherSlots, WordDict2).
+
+/*********************************************************************
  * candidates_for_slot/4
+ * candidates_for_slot(+Puzzle, +Slot, +WordDict, -Candidates)
  * Returns all valid candidate words from WordDict that:
- *   (1) match the slot's length,
- *   (2) don't conflict with puzzle's partially filled letters.
+ *   A: match the slot's length,
+ *   B: don't conflict with puzzle's partially filled letters.
  *
  * Arguments:
  *   Puzzle: The crossword grid
  *   slot(_Orient, Len, Coords): The slot to find candidates for
  *   WordDict: Dictionary of available words
  *   Candidates: List of valid candidates for this slot
+ *
+ * Strategy:
+ *   - Get all words of the same length from the dictionary.
+ *   - Filter the candidates to only include those that
+ *     are valid for the given slot.
+ *
+ * Note: Orientation is only used for debugging and not actually
+ *       relevant to the candidate selection.
  *********************************************************************/
 candidates_for_slot(Puzzle, slot(Orient, Len, Coords), WordDict, Candidates) :-
-    /* 1) Get all words for 'Len' from dictionary. */
     get_words_of_length(WordDict, Len, WordCandidates),
     debug(puzzle, 'Word candidates for length ~w: ~w', [Len, WordCandidates]),
 
-    /* 2) Filter out invalid candidates. */
     include(validate_candidate(Puzzle, Coords), WordCandidates, Candidates),
     debug(puzzle, 'Valid candidates for slot ~w: ~w', [slot(Orient, Len, Coords), Candidates]).
 
 /*********************************************************************
+ * get_words_of_length/3
+ * get_words_of_length(+WordDict, +WordLength, -Words)
+ * Retrieve the list of words for 'Length' from the dictionary.
+ *
+ * Arguments:
+ *   WordDict: The word dictionary
+ *   WordLength: Length of words to retrieve
+ *   WordsList: List of words of length L (empty if none found)
+ *
+ * Base Case: After processing all words for a given length, return empty list.
+ * Valid Case: If the length matches, return the list of words.
+ * Invalid Case: If the length does not match, continue searching.
+ *********************************************************************/
+get_words_of_length([], _L, []).
+get_words_of_length([Len-Words|_], WordLength, Words) :- WordLength == Len, !.
+get_words_of_length([_|Rest], WordLength, Words) :-
+    get_words_of_length(Rest, WordLength, Words).
+
+/*********************************************************************
  * validate_candidate/3
+ * validate_candidate(+Puzzle, +Coords, +Word)
  * Checks if a word is valid for a given slot
  *
  * Arguments:
@@ -430,6 +515,7 @@ validate_candidate(Puzzle, Coords, Word) :-
 
 /*********************************************************************
  * validate_cells/3
+ * validate_cells(+Puzzle, +Coords, +Word)
  * Checks if a word is compatible with existing letters in the grid
  *
  * Arguments:
@@ -437,51 +523,25 @@ validate_candidate(Puzzle, Coords, Word) :-
  *   Coords: List of (Row,Col) coordinates to check
  *   Word: List of letters to validate
  *
- * A word is valid if:
- * - For empty cells (var), any letter is allowed
- * - For filled cells, the letter must match what's already there
+ * Base Case: If no more cells or letters to check, return empty list.
+ * Valid Case: If the cell is unbound or already matches the letter,
+ *      continue checking the next cell and letter.
  *********************************************************************/
-validate_cells(_Puzzle, [], []).  % Base case: no more cells or letters to check.
-validate_cells(Puzzle, [(R, C) | Tcoords], [Letter | Rest]) :-
-    nth0(R, Puzzle, Row),
-    nth0(C, Row, Cell),
-    (   var(Cell) -> true  % Cell is unbound, valid
-    ;   Cell == Letter -> true  % Cell already contains the correct letter
+validate_cells(_Puzzle, [], []).
+validate_cells(Puzzle, [(RowIndex, ColIndex)|Coords], [Letter|Rest]) :-
+    % Retrieve Row based on RowIndex
+    nth0(RowIndex, Puzzle, Row),
+    % Retrieve Cell based on Row and ColIndex
+    nth0(ColIndex, Row, Cell),
+    % Check if Cell is unbound or already matches Letter, but do not unify
+    (   var(Cell) -> true
+    ;   Cell == Letter -> true
     ),
-    validate_cells(Puzzle, Tcoords, Rest).  % Recurse for the remaining cells and letters.
-
-/*********************************************************************
- * try_fill_slot_with_candidates/4
- * Attempt each candidate word in turn. If all fail => backtrack.
- *
- * Arguments:
- *   Puzzle: The crossword grid
- *   Slot: The slot to fill
- *   OtherSlots: Remaining slots to fill
- *   WordDict: Dictionary of available words
- *
- * If a candidate fails, we backtrack and try the next one.
- *********************************************************************/
-try_fill_slot_with_candidates(Puzzle, Slot, OtherSlots, WordDict) :-
-    /* Evaluate candidates for Slot. */
-    candidates_for_slot(Puzzle, Slot, WordDict, Candidates),
-    /* If there's at least one Word => place it. */
-    /* If no candidates, fail and backtrack. */
-    ( Candidates = [] ->
-        debug(puzzle, 'No candidates for slot ~w => fail', [Slot]),
-        fail
-    ; true ),
-    /* member is non-deterministic => backtrack on failure. */
-    member(Word, Candidates),
-    /* Try to place the word in the slot. */
-    debug(puzzle, 'Trying to place word ~w in slot ~w', [Word, Slot]),
-    place_word_in_slot(Puzzle, Slot, Word),
-    Slot = slot(_, Len, _),
-    remove_word_from_dict(WordDict, Len, Word, WordDict2),
-    fill_puzzle(Puzzle, OtherSlots, WordDict2).
+    validate_cells(Puzzle, Coords, Rest). 
 
 /*********************************************************************
  * place_word_in_slot/3
+ * place_word_in_slot(+Puzzle, +Slot, +Word)
  * Unifies puzzle cells with Word letters
  *
  * Arguments:
@@ -489,27 +549,64 @@ try_fill_slot_with_candidates(Puzzle, Slot, OtherSlots, WordDict) :-
  *   slot(_Orient,_Len,Coords): The slot to fill
  *   Word: The word to place in the slot
  *
+ * Base Case: If the slot has no more coordinates, return empty list
+ *      successfully placed word in slot and end recursion.
+ * Valid Case: If the slot has coordinates, place the letter in the
+ *      corresponding cell and recurse for the next letter.
+ *
  * No need to revert if we fail because Prolog automatically backtracks
  * these unifications.
  *********************************************************************/
 place_word_in_slot(_Puzzle, slot(_Orient,_Len,[]), []).
-place_word_in_slot(Puzzle, slot(O,L,[(R,C)|Coords]), [Letter|Rest]) :-
-    nth0(R, Puzzle, Row),
-    nth0(C, Row, Cell),
+place_word_in_slot(Puzzle, slot(O,L,[(RowIndex,ColIndex)|Coords]), [Letter|Rest]) :-
+    % Retrieve Row based on RowIndex
+    nth0(RowIndex, Puzzle, Row),
+    % Retrieve Cell based on Row and ColIndex
+    nth0(ColIndex, Row, Cell),
+    % Ensure Cell is unbound or already matches Letter and unify
     ( var(Cell) ->
         Cell = Letter
-    ; true  /* If it's already that letter => okay, else fail in conflict check. */
+    ; true  % If it's already that letter => okay, else fail in conflict check. 
     ),
     place_word_in_slot(Puzzle, slot(O,L,Coords), Rest).
 
 /*********************************************************************
+ * remove_word_from_dict/4
+ * remove_word_from_dict(+DictIn, +WordLength, +Word, -DictOut)
+ * Remove 'Word' from the dictionary bucket for 'Length'.
+ *
+ * Arguments:
+ *   DictIn: Input dictionary
+ *   WordLength: Length of the word
+ *   Word: The word to remove
+ *   DictOut: Dictionary after removal
+ *
+ * If that bucket becomes empty afterwards, remove that pair entirely.
+ *********************************************************************/
+remove_word_from_dict([], _L, _Word, []) :- 
+    /* Should not happen if we keep consistent usage. */
+    fail.
+
+remove_word_from_dict([Len-Words|Rest], L, Word, [Len-NewWords|Rest]) :-
+    L == Len, 
+    select(Word, Words, NewWords), 
+    NewWords \= [], 
+    !.
+
+remove_word_from_dict([Len-[Word]|Rest], L, Word, Rest) :-
+    /* If removing Word from that single-element bucket => remove bucket. */
+    L == Len, !.
+
+remove_word_from_dict([Pair|Rest], L, W, [Pair|NewRest]) :-
+    remove_word_from_dict(Rest, L, W, NewRest).
+
+/*********************************************************************
  * print_puzzle/1
+ * print_puzzle(+Puzzle)
  * Prints the completed puzzle to the console
  *
  * Arguments:
  *   Puzzle: The crossword grid to print
- *
- * This is a simple utility to visualize the filled puzzle.
  *********************************************************************/
 print_puzzle(Puzzle) :-
     debug(puzzle, 'Completed Puzzle:', []),
@@ -649,10 +746,8 @@ test(more_words_than_slots, true(Solutions = [])) :-
         ['#', _, '#']
     ],
     WordList = [
-        [a],
-        [b],
-        [c],
-        [d]
+        [a, b, c],
+        [d, e, f]
     ],
     copy_term(Puzzle, Sol),
     findall(Sol, puzzle_solution(Sol, WordList), Solutions),
