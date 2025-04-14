@@ -3,7 +3,7 @@
 :- use_module(library(plunit)).
 
 /*********************************************************************
- * Author:   [YOUR_NAME_HERE] <[YOUR_EMAIL_HERE]>
+ * Author:   Justin Lee <justinlee@student.unimelb.edu.au>
  * Purpose:  Crossword puzzle solver for automatic filling of crossword
  *           grids using a dictionary of words
  *
@@ -26,20 +26,25 @@
 /*********************************************************************
  * puzzle_solution/2
  *
- * The main entry point: 
- *   Puzzle = list-of-lists, each cell either '#', a letter, or var(_).
- *   WordList = list of words, each word is a list of letters.
+ * The main entry point of the crossword solver.
  *
- * Algorithm steps:
- *  1) Build dictionary: length -> [words of that length].
- *  2) Extract all horizontal & vertical slots. Store as a simple list.
- *  3) fill_puzzle(Puzzle, Slots, WordDict):
- *      - If no more slots => must check WordDict is empty => success/fail
- *      - Else pick the slot with the fewest candidate words => fill it
- *        by trying each candidate. If all fail => backtrack.
- *  4) A candidate word is one that matches length & partial puzzle letters.
- *  5) Each time we place a word in a slot, we remove that word from
- *     the dictionary (since each word can only be used once).
+ * Arguments:
+ *   Puzzle    : A list of lists representing the crossword grid.
+ *               Each cell is either:
+ *                 - '#' (a blocked cell),
+ *                 - a lowercase letter (a pre-filled cell), or
+ *                 - an unbound variable (_) representing an empty cell.
+ *   WordList  : A list of words, where each word is a list of lowercase letters.
+ *
+ * Workflow:
+ *   1) Constructs a dictionary mapping word lengths to word lists.
+ *   2) Extracts all fillable horizontal and vertical slots from the grid.
+ *   3) Applies a constraint-driven, recursive search to fill the puzzle,
+ *      always selecting the most constrained slot (fewest valid candidates).
+ *
+ * Constraints:
+ *   - Each word in the WordList must be used exactly once.
+ *   - The filled puzzle must be consistent with any pre-filled letters.
  *********************************************************************/
 puzzle_solution(Puzzle, WordList) :-
     /* 1) Build dictionary of words by length. */
@@ -124,13 +129,13 @@ insert_word_in_dict(L, W, [Pair|Rest], [Pair|NewRest]) :-
  * number of cells, and Coordinates is a list of (Row,Col) pairs.
  *********************************************************************/
 extract_all_slots(Puzzle, AllSlots) :-
-    writeln('Extracting slots...'),
+    debug(puzzle, 'Extracting slots...', []),
     extract_horizontal_slots(Puzzle, HSlots),
-    writeln('Horizontal slots:'), writeln(HSlots),
+    debug(puzzle, 'Horizontal slots: ~w', [HSlots]),
     extract_vertical_slots(Puzzle, VSlots),
-    writeln('Vertical slots:'), writeln(VSlots),
+    debug(puzzle, 'Vertical slots: ~w', [VSlots]),
     append(HSlots, VSlots, AllSlots),
-    writeln('All slots:'), writeln(AllSlots).
+    debug(puzzle, 'All slots: ~w', [AllSlots]).
 
 /*********************************************************************
  * extract_horizontal_slots/2
@@ -142,14 +147,13 @@ extract_all_slots(Puzzle, AllSlots) :-
  *********************************************************************/
 extract_horizontal_slots(Puzzle, HSlots) :-
     length(Puzzle, NumRows),
-    format("NumRows = ~w~n", [NumRows]),
+    debug(puzzle, 'Number of rows in puzzle: ~w', [NumRows]),
     NumRowsMinus1 is NumRows - 1,
 
     findall(RowSlots,
       ( between(0, NumRowsMinus1, RowIndex),
-        format("RowIndex = ~w~n", [RowIndex]),
         nth0(RowIndex, Puzzle, Row),
-        format("Row = ~w~n", [Row]),
+        debug(puzzle, 'Row index: ~w | Row: ~w', [RowIndex, Row]),
         row_to_slots(Row, RowIndex, RowSlots)
       ),
       SlotsPerRow),
@@ -181,24 +185,21 @@ row_to_slots(RowList, RowIndex, RowSlots) :-
 collect_runs([], _, []).
 collect_runs([Cell|T], Col, Runs) :-
     Cell == '#',  % blocked => skip
-    writeln(['Blocked cell at', Col]),
+    debug(puzzle, 'Blocked cell at column ~w', [Col]),
     Col1 is Col + 1,
     collect_runs(T, Col1, Runs).
 
 collect_runs([Cell|T], Col, [[Col|MoreCols] | OtherRuns]) :-
     Cell \== '#',  % open cell
-    format("Open cell at column ~w: ~w~n", [Col, Cell]),
-    writeln(['Cell', Cell]),
+    debug(puzzle, 'Open cell at column ~w', [Col]),
     ColPlusOne is Col + 1,
     collect_consecutive(T, ColPlusOne, MoreCols, Remainder),
     length(MoreCols, RunLength),
-    writeln(['ColPlusOne:', ColPlusOne]),
-    writeln(['RunLength:', RunLength]),
     % ColPlusOne is the starting column of the consecutive run
     % RunLength is the length of the consecutive run
     % + 1 for the next column after the consecutive run terminates
     NextCol is ColPlusOne + RunLength + 1,
-    writeln(['NextCol:', NextCol]),
+    debug(puzzle, 'Next column to check: ~w', [NextCol]),
     collect_runs(Remainder, NextCol, OtherRuns).
 
 /*********************************************************************
@@ -214,11 +215,11 @@ collect_runs([Cell|T], Col, [[Col|MoreCols] | OtherRuns]) :-
 collect_consecutive([], _Col, [], []).
 collect_consecutive([Cell|T], Col, [], T) :-
     Cell == '#', 
-    format("Terminating run at blocked cell in column ~w~n", [Col]),
+    debug(puzzle, 'End of consecutive run at column ~w', [Col]),
     !.
 collect_consecutive([Cell|T], Col, [Col|More], Remainder) :-
     Cell \== '#',
-    format("Collecting consecutive open cell at column ~w~n", [Col]),
+    debug(puzzle, 'Consecutive cell at column ~w', [Col]),
     Col1 is Col + 1,
     collect_consecutive(T, Col1, More, Remainder).
 
@@ -341,9 +342,9 @@ remove_word_from_dict([Pair|Rest], L, W, [Pair|NewRest]) :-
 fill_puzzle(_Puzzle, [], WordDict) :-
     /* If no more slots, we succeed only if no leftover words remain. */
     ( WordDict == [] ->
-        writeln('All slots filled successfully.'),
+        debug(puzzle, 'All slots filled successfully!', []),
         !
-      ; writeln(['No more slots, but leftover words remain', WordDict, ' => fail']),
+        ; debug(puzzle, 'Leftover words in dictionary:', [WordDict]),
         fail
     ).
 
@@ -405,13 +406,14 @@ pick_most_constrained_slot_aux(Puzzle, [S2|Ss], WDict, BestSlotSoFar, BestCount,
  *   WordDict: Dictionary of available words
  *   Candidates: List of valid candidates for this slot
  *********************************************************************/
-candidates_for_slot(Puzzle, slot(_Orient, Len, Coords), WordDict, Candidates) :-
+candidates_for_slot(Puzzle, slot(Orient, Len, Coords), WordDict, Candidates) :-
     /* 1) Get all words for 'Len' from dictionary. */
     get_words_of_length(WordDict, Len, WordCandidates),
-    writeln(['Word candidates for length', Len, '=>', WordCandidates]),
+    debug(puzzle, 'Word candidates for length ~w: ~w', [Len, WordCandidates]),
+
     /* 2) Filter out invalid candidates. */
     include(validate_candidate(Puzzle, Coords), WordCandidates, Candidates),
-    writeln(['Valid candidates after check:', Candidates, 'for slot with coords', Coords]).
+    debug(puzzle, 'Valid candidates for slot ~w: ~w', [slot(Orient, Len, Coords), Candidates]).
 
 /*********************************************************************
  * validate_candidate/3
@@ -465,12 +467,13 @@ try_fill_slot_with_candidates(Puzzle, Slot, OtherSlots, WordDict) :-
     /* If there's at least one Word => place it. */
     /* If no candidates, fail and backtrack. */
     ( Candidates = [] ->
-        format('No candidates for slot: ~w~n', [Slot]), fail
+        debug(puzzle, 'No candidates for slot ~w => fail', [Slot]),
+        fail
     ; true ),
     /* member is non-deterministic => backtrack on failure. */
     member(Word, Candidates),
     /* Try to place the word in the slot. */
-    format('Trying word ~w in slot ~w~n', [Word, Slot]),
+    debug(puzzle, 'Trying to place word ~w in slot ~w', [Word, Slot]),
     place_word_in_slot(Puzzle, Slot, Word),
     Slot = slot(_, Len, _),
     remove_word_from_dict(WordDict, Len, Word, WordDict2),
@@ -500,19 +503,20 @@ place_word_in_slot(Puzzle, slot(O,L,[(R,C)|Coords]), [Letter|Rest]) :-
 
 
 print_puzzle(Puzzle) :-
-    writeln('Completed Puzzle:'),
+    debug(puzzle, 'Completed Puzzle:', []),
     maplist(print_row, Puzzle).
 
 print_row(Row) :-
-    writeln(Row).
+    debug(puzzle, '~w', [Row]).
 
 /*********************************************************************
  * Tests
  *********************************************************************/
-:- begin_tests(puzzle_solution).
+:- begin_tests(puzzle_solution, [setup(debug(puzzle))]).
 
-/* Test Case 1: example */
+/* Test Case 1: example */  
 test(example,[nondet]) :-
+    debug(puzzle, '>>> STARTING EXAMPLE TEST <<<', []),
     Puzzle = [
         ['#', h, '#'],
         [ _,  _,  _ ],
@@ -523,16 +527,18 @@ test(example,[nondet]) :-
         [b, a, g]
     ],
     puzzle_solution(Puzzle, WordList),
-    print_puzzle(Puzzle),  % Print the completed puzzle
+    print_puzzle(Puzzle),
     ExpectedPuzzle = [
         ['#', h, '#'],
         [ b,  a,  g ],
         ['#', t, '#']
     ],
-    assertion(Puzzle == ExpectedPuzzle).
+    assertion(Puzzle == ExpectedPuzzle),
+    debug(puzzle, '>>> EXAMPLE TEST PASSED <<<', []).
 
 /* Test Case 2: small_puzzle */
 test(small_puzzle,[nondet]) :-
+    debug(puzzle, '>>> STARTING SMALL PUZZLE TEST <<<', []),
     Puzzle = [
         [ _,  '#', _ ],
         [ _,   _,  _ ],
@@ -545,22 +551,24 @@ test(small_puzzle,[nondet]) :-
         [a, r]
     ],
     puzzle_solution(Puzzle, WordList),
-    print_puzzle(Puzzle),  % Print the completed puzzle
+    print_puzzle(Puzzle),
     ExpectedPuzzle = [
         [ e, '#', i ],
         [ c,  a,  t ],
         ['#', r, '#' ]
     ],
-    assertion(Puzzle == ExpectedPuzzle).
+    assertion(Puzzle == ExpectedPuzzle),
+    debug(puzzle, '>>> SMALL PUZZLE TEST PASSED <<<', []).
 
 /* Test Case 3: wikipedia puzzle */
 test(wikipedia, [nondet]) :-
+    debug(puzzle, '>>> STARTING WIKIPEDIA PUZZLE TEST <<<', []),
     Puzzle = [
         ['#', '#', '#',  _ ,  _ ,  _ , '#', '#', '#', '#'],
         ['#', '#', '#',  _ ,  _ ,  _ ,  _ , '#', '#', '#'],
-        ['#',  d ,  _ ,  _ ,  _ , '#',  _ ,  _ , '#', '#'],
-        ['#',  a ,  _ ,  _ ,  _ ,  _ ,  _ ,  _ , '#', '#'],
-        ['#',  g ,  _ , '#',  _ ,  _ ,  _ ,  _ , '#', '#'],
+        ['#',  _ ,  _ ,  _ ,  _ , '#',  _ ,  _ , '#', '#'],
+        ['#',  _ ,  _ ,  _ ,  _ ,  _ ,  _ ,  _ , '#', '#'],
+        ['#',  _ ,  _ , '#',  _ ,  _ ,  _ ,  _ , '#', '#'],
         ['#', '#',  _ ,  _ ,  _ ,  _ , '#', '#', '#', '#'],
         ['#', '#', '#',  _ ,  _ ,  _ , '#', '#', '#', '#']
     ],
@@ -585,7 +593,7 @@ test(wikipedia, [nondet]) :-
         [v, e, s, i, c, l, e]
     ],
     puzzle_solution(Puzzle, WordList),
-    print_puzzle(Puzzle),  % Print the completed puzzle
+    print_puzzle(Puzzle),
     ExpectedPuzzle = [
         ['#', '#', '#',  e ,  v ,  o , '#', '#', '#', '#'],
         ['#', '#', '#',  d ,  e ,  n ,  s , '#', '#', '#'],
@@ -595,10 +603,12 @@ test(wikipedia, [nondet]) :-
         ['#', '#',  d ,  o ,  l ,  e , '#', '#', '#', '#'],
         ['#', '#', '#',  r ,  e ,  f , '#', '#', '#', '#']
     ],
-    assertion(Puzzle == ExpectedPuzzle).
+    assertion(Puzzle == ExpectedPuzzle),
+    debug(puzzle, '>>> WIKIPEDIA PUZZLE TEST PASSED <<<', []).
 
 /* Test Case 4: More slots than words (should fail) */
 test(more_slots_than_words, [fail]) :-
+    debug(puzzle, '>>> STARTING MORE SLOTS THAN WORDS TEST <<<', []),
     Puzzle = [
         [ _,  _,  _,  _ ],
         [ _,  _,  _,  _ ],
@@ -610,10 +620,12 @@ test(more_slots_than_words, [fail]) :-
         [d, o, g]
     ],
     puzzle_solution(Puzzle, WordList),
-    print_puzzle(Puzzle).  % Print the completed puzzle
+    print_puzzle(Puzzle),
+    debug(puzzle, '>>> MORE SLOTS THAN WORDS TEST FAILED <<<', []).
 
 /* Test Case 5: More words than slots (should fail) */
 test(more_words_than_slots, [fail]) :-
+    debug(puzzle, '>>> STARTING MORE WORDS THAN SLOTS TEST <<<', []),
     Puzzle = [
         ['#', _, '#'],
         ['#', _, '#'],
@@ -626,10 +638,12 @@ test(more_words_than_slots, [fail]) :-
         [d]
     ],
     puzzle_solution(Puzzle, WordList),
-    print_puzzle(Puzzle).  % Print the completed puzzle
+    print_puzzle(Puzzle),
+    debug(puzzle, '>>> MORE WORDS THAN SLOTS TEST FAILED <<<', []).
 
 /* Test Case 6: Most constrained slot challenge */
 test(most_constrained_slot, [nondet]) :-
+    debug(puzzle, '>>> STARTING MOST CONSTRAINED SLOT TEST <<<', []),
     Puzzle = [
         [ _,  _,  r,  _ ],
         [ _,  _,  a,  _ ],
@@ -647,17 +661,19 @@ test(most_constrained_slot, [nondet]) :-
         [t, r, e, e]
     ],
     puzzle_solution(Puzzle, WordList),
-    print_puzzle(Puzzle),  % Print the completed puzzle
+    print_puzzle(Puzzle),
     ExpectedPuzzle = [
         [ c,  a,  r,  t ],
         [ z,  x,  a,  r ],
         [ h,  a,  t,  e ],
         [ c,  k,  e,  e ]
     ],
-    assertion(Puzzle == ExpectedPuzzle).
+    assertion(Puzzle == ExpectedPuzzle),
+    debug(puzzle, '>>> MOST CONSTRAINED SLOT TEST PASSED <<<', []).
 
 /* Test Case 7: 10x10 sized puzzle */
 test(ten_by_ten, [nondet]) :-
+    debug(puzzle, '>>> STARTING 10x10 PUZZLE TEST <<<', []),
     Puzzle = [
         [ _,  _,  _,  _,  _,  _,  _,  _,  _,  _ ],
         [ _,  _,  _,  _,  _, '#', _,  _,  _,  _ ],
@@ -724,10 +740,12 @@ test(ten_by_ten, [nondet]) :-
         [ l,  w,  n,  e,  i,  u,  e,  y,  d,  x ],
         ['#', m,  e, '#', r,  v, '#', t,  u,  v ]
     ],
-    assertion(Puzzle == ExpectedPuzzle).
+    assertion(Puzzle == ExpectedPuzzle),
+    debug(puzzle, '>>> 10x10 PUZZLE TEST PASSED <<<', []).
 
 /* Test Case 8: 15x15 sized puzzle */
 test(fifteen_by_fifteen, [nondet]) :-
+    debug(puzzle, '>>> STARTING 15x15 PUZZLE TEST <<<', []),
     Puzzle = [
         [ _,  _,  _,  _,  _, '#', _,  _,  _,  _,  _,  _,  _,  _,  _ ],
         [ _,  _,  _,  _,  _, '#', _, '#', _,  _,  _,  _,  _,  _,  _ ],
@@ -820,7 +838,7 @@ test(fifteen_by_fifteen, [nondet]) :-
         [z, m, z]
     ],
     puzzle_solution(Puzzle, WordList),
-    print_puzzle(Puzzle),  % Print the completed puzzle
+    print_puzzle(Puzzle),
     ExpectedPuzzle = [
         [ a,  b,  c,  d,  e, '#', f,  g,  h,  i,  j,  k,  l,  m,  n ],
         [ o,  p,  q,  r,  s, '#', t, '#', u,  v,  w,  x,  y,  z,  a ],
@@ -838,6 +856,7 @@ test(fifteen_by_fifteen, [nondet]) :-
         [ a,  b,  c,  d,  e, '#', f,  g,  h, '#', i,  j,  k,  l,  m ],
         [ n,  o,  p,  q,  r, '#', s,  t, '#', u,  v,  w,  x,  y,  z ]
     ],
-    assertion(Puzzle == ExpectedPuzzle).
+    assertion(Puzzle == ExpectedPuzzle),
+    debug(puzzle, '>>> 15x15 PUZZLE TEST PASSED <<<', []).
 
 :- end_tests(puzzle_solution).
