@@ -11,7 +11,9 @@
  * a dynamic algorithm approach known as Minimum Remaining Values (MRV)
  * heuristic — also known as the "most constrained variable first" 
  * strategy. In essence, the algorithm identifies the slot with the fewest
- * possible candidates and attempts to fill it first.
+ * possible candidates and attempts to fill it first. There is an additional
+ * modification where in the event of a tiebreaker, the algorithm will
+ * prioritise the slot with the longest length.
  *
  * Key Constraints:
  *   - Each word from the WordList must be used exactly once.
@@ -374,6 +376,7 @@ fill_puzzle(Puzzle, Slots, WordDict) :-
  * pick_most_constrained_slot/5
  * pick_most_constrained_slot(+Puzzle, +Slots, +WordDict, -SelectedSlot, -OtherSlots)
  * Evaluate candidate count for each slot => pick the one with min #.
+ * If a tie, pick the longest slot.
  *
  * Arguments:
  *   Puzzle: The crossword grid
@@ -399,8 +402,9 @@ pick_most_constrained_slot(Puzzle, [Slot|Slots], WordDict, SelectedSlot, OtherSl
 /*********************************************************************
  * pick_most_constrained_slot_aux/6
  * pick_most_constrained_slot_aux(+Puzzle, +Slots, +WordDict, +BestSlotSoFar,
- *                                +LowestCount, -SelectedSlot)
- * Helper to find the slot with the fewest candidate words
+ *                                +LowestCount, +HighestSlotLength, -SelectedSlot)
+ * Helper to find the slot with the fewest candidate words or if a tie,
+ * the longest slot.
  *
  * Arguments:
  *   Puzzle: The crossword grid
@@ -408,6 +412,7 @@ pick_most_constrained_slot(Puzzle, [Slot|Slots], WordDict, SelectedSlot, OtherSl
  *   WordDict: Dictionary of available words
  *   BestSlotSoFar: Best slot found so far
  *   LowestCount: Number of candidates for best slot so far (lower is better)
+ *   HighestSlotLength: Length of the best slot so far (higher is better)
  *   SelectedSlot: Selected slot with the fewest candidates
  *
  * Base Case: After recursing through all slots, return the best slot
