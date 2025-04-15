@@ -1062,7 +1062,7 @@ test(fifteen_by_fifteen_2, true(Solutions = [ExpectedPuzzle])) :-
     ],
     debug(puzzle, '>>> 15x15 #2 PUZZLE TEST PASSED <<<', []).
 
-test(thirty_two_by_twenty, true(Sol == ExpectedPuzzle)) :-
+test(thirty_two_by_twenty, true(Solutions == [ExpectedPuzzle])) :-
     debug(puzzle, '>>> STARTING 32x20 PUZZLE TEST <<<', []),
     Puzzle = [
         [ _,  _,  _,  _,  _, '#', _,  _,  _,  _,  _,  _,  _, '#', _,  _,  _,  _, '#', _ ],
@@ -1158,12 +1158,12 @@ test(thirty_two_by_twenty, true(Sol == ExpectedPuzzle)) :-
         [l, o, v, e, l, y],
         [b, r, a, i, n],
         [y, u, m, m, y, y],
-        [i, n],
+        [i, x],
         [i, n, i, t, i, a, l],
         [d, r, i, v, e],
         [b, l, a],
         [e, v, o, l, u, t, i, o, n],
-        [t, o, n, i, g, h, t],
+        [t, o, p, i, g, h, t],
         [b, a],
         [v, o, l, v, o],
         [o, n, l, i, n, e],
@@ -1213,7 +1213,7 @@ test(thirty_two_by_twenty, true(Sol == ExpectedPuzzle)) :-
         [h, a, p, p, y],
         [a, h, h],
         [e, s, t, a, t, i, c],
-        [t, h, o, e, e, o, n, v, o, m, e, o, v, p, a, c, l, r, u, t, d, u, o],
+        [t, h, o, e, e, o, x, v, o, m, e, o, v, p, a, c, l, r, u, t, d, u, o],
         [e, m, o, t],
         [n, u, m, i, h, e, o],
         [l, v],
@@ -1258,7 +1258,7 @@ test(thirty_two_by_twenty, true(Sol == ExpectedPuzzle)) :-
         [t, w, y, i, i, n, d, o, e, h, y, h, e, n, t, q, n, p, m, m, n, r, i],
         [g, a, m, i, n, g],
         [t, r],
-        [r, n],
+        [r, p],
         [a, g, e, t, r, n, t, o, b, t, c, t],
         [m, m, n],
         [e, e, w, a, m, i, m, o, i, y, i, i, t, i, l, t, r, r, l, z, e],
@@ -1311,8 +1311,8 @@ test(thirty_two_by_twenty, true(Sol == ExpectedPuzzle)) :-
         [ b,  e, '#', g,  o,  n,  e, '#', t,  r,  a,  i,  t,  o,  r, '#', f,  i,  l,  t ],
         [ e,  e,  l, '#', l,  l,  l, '#', d,  e,  l,  i,  r,  i,  o,  u,  s, '#', o,  p ],
         [ l,  o,  v,  e,  l,  y, '#', b,  r,  a,  i,  n, '#', y,  u,  m,  m,  y,  y, '#'],
-        [ i,  n, '#', i,  n,  i,  t,  i,  a,  l, '#', d,  r,  i,  v,  e, '#', b,  l,  a ],
-        [ e,  v,  o,  l,  u,  t,  i,  o,  n, '#', t,  o,  n,  i,  g,  h,  t, '#', b,  a ],
+        [ i,  x, '#', i,  n,  i,  t,  i,  a,  l, '#', d,  r,  i,  v,  e, '#', b,  l,  a ],
+        [ e,  v,  o,  l,  u,  t,  i,  o,  n, '#', t,  o,  p,  i,  g,  h,  t, '#', b,  a ],
         [ v,  o,  l,  v,  o, '#', o,  n,  l,  i,  n,  e, '#', t,  a,  c,  t,  i,  c,  a ],
         [ a,  m,  b,  i,  e,  n,  t, '#', l,  i,  g,  h,  t,  i,  n,  g, '#', h,  o,  m ],
         [ b,  e,  e,  s, '#', d,  i,  s,  p,  l,  a,  y, '#', l,  i,  g,  h,  t,  n,  i ],
