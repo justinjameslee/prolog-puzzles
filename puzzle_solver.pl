@@ -67,7 +67,7 @@ puzzle_solution(Puzzle, WordList) :-
  *   Then WordDict will be:
  *   [
  *     2-[[i,t],[i,f]],
- *     3-[c,a,t],[b,a,g]]
+ *     3-[[c,a,t],[b,a,g]]
  *   ]
  *
  * Note:
@@ -397,7 +397,7 @@ pick_most_constrained_slot(Puzzle, [Slot|Slots], WordDict, SelectedSlot, OtherSl
 /*********************************************************************
  * pick_most_constrained_slot_aux/6
  * pick_most_constrained_slot_aux(+Puzzle, +Slots, +WordDict, +BestSlotSoFar,
- *                                +LowestCount, -FinalSlot)
+ *                                +LowestCount, -SelectedSlot)
  * Helper to find the slot with the fewest candidate words
  *
  * Arguments:
@@ -406,7 +406,7 @@ pick_most_constrained_slot(Puzzle, [Slot|Slots], WordDict, SelectedSlot, OtherSl
  *   WordDict: Dictionary of available words
  *   BestSlotSoFar: Best slot found so far
  *   LowestCount: Number of candidates for best slot so far (lower is better)
- *   FinalSlot: Final selected slot (output)
+ *   SelectedSlot: Selected slot with the fewest candidates
  *
  * Base Case: After recursing through all slots, return the best slot
  *      BestSlotSoFar is returned as the final slot.
@@ -414,12 +414,12 @@ pick_most_constrained_slot(Puzzle, [Slot|Slots], WordDict, SelectedSlot, OtherSl
  *      slot so far, update the best slot and continue searching.
  *********************************************************************/
 pick_most_constrained_slot_aux(_Puzzle, [], _WDict, Slot, _Count, Slot).
-pick_most_constrained_slot_aux(Puzzle, [CurrentSlot|Slots], WordDict, BestSlotSoFar, LowestCount, FinalSlot) :-
+pick_most_constrained_slot_aux(Puzzle, [CurrentSlot|Slots], WordDict, BestSlotSoFar, LowestCount, SelectedSlot) :-
     candidates_for_slot(Puzzle, CurrentSlot, WordDict, CurrentCandidates),
     length(CurrentCandidates, CurrentCount),
     ( CurrentCount < LowestCount ->
-        pick_most_constrained_slot_aux(Puzzle, Slots, WordDict, CurrentSlot, CurrentCount, FinalSlot)
-    ; pick_most_constrained_slot_aux(Puzzle, Slots, WordDict, BestSlotSoFar, LowestCount, FinalSlot)
+        pick_most_constrained_slot_aux(Puzzle, Slots, WordDict, CurrentSlot, CurrentCount, SelectedSlot)
+    ; pick_most_constrained_slot_aux(Puzzle, Slots, WordDict, BestSlotSoFar, LowestCount, SelectedSlot)
     ).
 
 /*********************************************************************
@@ -433,7 +433,7 @@ pick_most_constrained_slot_aux(Puzzle, [CurrentSlot|Slots], WordDict, BestSlotSo
  *   OtherSlots: Remaining slots to fill
  *   WordDict: Dictionary of available words
  *
- * Starategy:
+ * Strategy:
  *   - Get all candidates for this slot.
  *   - If no candidates => fail.
  *   - For each candidate:
@@ -491,22 +491,22 @@ candidates_for_slot(Puzzle, slot(Orient, Len, Coords), WordDict, Candidates) :-
 
 /*********************************************************************
  * get_words_of_length/3
- * get_words_of_length(+WordDict, +WordLength, -Words)
- * Retrieve the list of words for 'Length' from the dictionary.
+ * get_words_of_length(+WordDict, +WordLength, -WordCandidates)
+ * Retrieve the list of words for 'WordLength' from the dictionary.
  *
  * Arguments:
  *   WordDict: The word dictionary
- *   WordLength: Length of words to retrieve
- *   WordsList: List of words of length L (empty if none found)
+ *   WordLength: Length of the words to retrieve
+ *   WordCandidates: List of words of length 'WordLength'
  *
  * Base Case: After processing all words for a given length, return empty list.
  * Valid Case: If the length matches, return the list of words.
  * Invalid Case: If the length does not match, continue searching.
  *********************************************************************/
 get_words_of_length([], _L, []).
-get_words_of_length([Len-Words|_], WordLength, Words) :- WordLength == Len, !.
-get_words_of_length([_|Rest], WordLength, Words) :-
-    get_words_of_length(Rest, WordLength, Words).
+get_words_of_length([Len-WordCandidates|_], WordLength, WordCandidates) :- WordLength == Len, !.
+get_words_of_length([_|Rest], WordLength, WordCandidates) :-
+    get_words_of_length(Rest, WordLength, WordCandidates).
 
 /*********************************************************************
  * validate_candidate/3
@@ -554,19 +554,21 @@ validate_cells(Puzzle, [(RowIndex, ColIndex)|Coords], [Letter|Rest]) :-
  *
  * Arguments:
  *   Puzzle: The crossword grid
- *   slot(_Orient,_Len,Coords): The slot to fill
+ *   slot(Orient,Len,Coords): The slot to fill
  *   Word: The word to place in the slot
  *
- * Base Case: If the slot has no more coordinates, return empty list
- *      successfully placed word in slot and end recursion.
+ * Note: Orientation and Length are not used in this predicate.
+ *
+ * Base Case: If the slot has no more coordinates, 
+ *      the word has been placed successfully.
  * Valid Case: If the slot has coordinates, place the letter in the
  *      corresponding cell and recurse for the next letter.
  *
  * No need to revert if we fail because Prolog automatically backtracks
  * these unifications.
  *********************************************************************/
-place_word_in_slot(_Puzzle, slot(_Orient,_Len,[]), []).
-place_word_in_slot(Puzzle, slot(O,L,[(RowIndex,ColIndex)|Coords]), [Letter|Rest]) :-
+place_word_in_slot(_Puzzle, slot(_Orient, _Len, []), []).
+place_word_in_slot(Puzzle, slot(Orient, Len, [(RowIndex,ColIndex)|Coords]), [Letter|Rest]) :-
     % Retrieve Row based on RowIndex
     nth0(RowIndex, Puzzle, Row),
     % Retrieve Cell based on Row and ColIndex
@@ -576,7 +578,7 @@ place_word_in_slot(Puzzle, slot(O,L,[(RowIndex,ColIndex)|Coords]), [Letter|Rest]
         Cell = Letter
     ; true  % If it's already that letter => okay, else fail in conflict check. 
     ),
-    place_word_in_slot(Puzzle, slot(O,L,Coords), Rest).
+    place_word_in_slot(Puzzle, slot(Orient, Len, Coords), Rest).
 
 /*********************************************************************
  * remove_word_from_dict/4
@@ -985,5 +987,71 @@ test(fifteen_by_fifteen, true(Solutions = [ExpectedPuzzle])) :-
         [ d,  e,  l,  i,  r,  i,  o,  u,  s, '#', p,  l,  a,  t,  e ]
     ],
     debug(puzzle, '>>> 15x15 PUZZLE TEST PASSED <<<', []).
+
+/* Test Case 9: 15x15 #2 */
+test(fifteen_by_fifteen_2, true(Solutions = [ExpectedPuzzle])) :-
+    debug(puzzle, '>>> STARTING 15x15 #2 PUZZLE TEST <<<', []),
+    Puzzle = [
+        [ _,  _,  _,  _, '#', _,  _,  _,  _, '#', _,  _,  _,  _,  _ ],
+        [ _,  _,  _,  _, '#', _,  _,  _,  _, '#', _,  _,  _,  _,  _ ],
+        [ _,  _,  _,  _, '#', _,  _,  _,  _, '#', _,  _,  _,  _,  _ ],
+        [ _,  _,  _,  _,  _,  _,  _, '#', _,  _,  _,  _,  _,  _,  _ ],
+        [ _,  _,  _,  _,  _,  _, '#', _,  _,  _,  _,  _, '#','#','#'],
+        ['#','#','#', _,  _,  _,  _,  _, '#', _,  _,  _,  _,  _,  _ ],
+        [ _,  _,  _,  _,  _, '#', _,  _,  _,  _, '#', _,  _,  _,  _ ],
+        [ _,  _,  _, '#','#', _,  _,  _,  _,  _, '#','#', _,  _,  _ ],
+        [ _,  _,  _,  _, '#', _,  _,  _,  _, '#', _,  _,  _,  _,  _ ],
+        [ _,  _,  _,  _,  _,  _, '#', _,  _,  _,  _,  _, '#','#','#'],
+        ['#','#','#', _,  _,  _,  _,  _, '#', _,  _,  _,  _,  _,  _ ],
+        [ _,  _,  _,  _,  _,  _,  _, '#', _,  _,  _,  _,  _,  _,  _ ],
+        [ _,  _,  _,  _,  _, '#', _,  _,  _,  _, '#', _,  _,  _,  _ ],
+        [ _,  _,  _,  _,  _, '#', _,  _,  _,  _, '#', _,  _,  _,  _ ],
+        [ _,  _,  _,  _,  _, '#', _,  _,  _,  _, '#', _,  _,  _,  _ ]
+    ],
+    WordList = [
+        [a,r,i], [l,c,d], [n,s,a], [s,u,r],
+        [a,c,i,s], [a,c,t,i], [a,i,e,e], [a,l,t,a],
+        [a,r,a,n], [a,r,c,o], [a,s,i,c], [b,e,d,s],
+        [b,i,n,o], [b,o,a,g], [c,a,a,n], [d,a,i,l],
+        [e,a,l,e], [e,a,s,t], [e,l,s,a], [e,t,t,a],
+        [h,e,r,n], [h,u,a,c], [i,b,i,s], [i,g,l,u],
+        [i,i,r,c], [i,n,l,y], [l,a,s,t], [l,o,w,n],
+        [m,i,c,a], [p,f,u,i], [r,a,y,a], [r,c,m,p],
+        [t,a,f,e], [t,a,o,s], [u,n,c,e], [u,r,b,s],
+        [y,a,r,t], [z,o,o,b], [j,o,s,e,p,h],
+        [a,b,o,d,e], [a,l,i,f,e], [a,n,u,a,l], [a,u,l,o,s],
+        [c,a,j,o,n], [c,a,n,a,l], [c,o,b,i,a], [e,a,s,e,r],
+        [e,n,a,c,t], [g,i,g,o,t], [h,e,l,o,t], [k,a,r,r,i],
+        [k,i,s,a,n], [o,a,s,i,s], [o,n,i,o,n], [o,r,a,c,y],
+        [r,a,b,b,i], [r,a,i,d,s], [r,u,t,i,n], [s,c,a,d,a],
+        [t,s,u,b,a], [t,w,i,x,t], [y,d,r,a,d],
+        [a,n,c,h,o,r], [a,s,p,e,c,t], [e,a,t,e,r,y],
+        [e,m,b,r,y,o], [o,d,e,s,s,a],
+        [r,o,c,o,c,o], [s,m,i,g,h,t],
+        [a,n,a,l,y,s,t], [a,p,p,l,i,e,s], [e,c,o,l,o,g,y],
+        [f,i,x,t,u,r,e], [i,n,s,t,e,a,d], [o,e,r,s,t,e,d],
+        [t,h,e,r,e,i,n], [t,h,y,r,o,i,d], [u,t,i,l,i,z,e]
+    ],
+    copy_term(Puzzle, Sol),
+    findall(Sol, puzzle_solution(Sol, WordList), Solutions),
+    maplist(print_puzzle, Solutions),
+    ExpectedPuzzle = [
+        [ a,  c,  t,  i, '#', e,  a,  l,  e, '#', r,  a,  b,  b,  i ],
+        [ l,  o,  w,  n, '#', m,  i,  c,  a, '#', o,  n,  i,  o,  n ],
+        [ i,  b,  i,  s, '#', b,  e,  d,  s, '#', c,  a,  n,  a,  l ],
+        [ f,  i,  x,  t,  u,  r,  e, '#', e,  c,  o,  l,  o,  g,  y ],
+        [ e,  a,  t,  e,  r,  y, '#', o,  r,  a,  c,  y, '#','#','#'],
+        ['#','#','#', a,  b,  o,  d,  e, '#', j,  o,  s,  e,  p,  h ],
+        [ r,  a,  i,  d,  s, '#', a,  r,  c,  o, '#', t,  a,  f,  e ],
+        [ a,  r,  i, '#','#', k,  i,  s,  a,  n, '#','#', s,  u,  r ],
+        [ y,  a,  r,  t, '#', a,  l,  t,  a, '#', r,  u,  t,  i,  n ],
+        [ a,  n,  c,  h,  o,  r, '#', e,  n,  a,  c,  t, '#','#','#'],
+        ['#','#','#', y,  d,  r,  a,  d, '#', s,  m,  i,  g,  h,  t ],
+        [ t,  h,  e,  r,  e,  i,  n, '#', a,  p,  p,  l,  i,  e,  s ],
+        [ a,  u,  l,  o,  s, '#', u,  n,  c,  e, '#', i,  g,  l,  u ],
+        [ o,  a,  s,  i,  s, '#', a,  s,  i,  c, '#', z,  o,  o,  b ],
+        [ s,  c,  a,  d,  a, '#', l,  a,  s,  t, '#', e,  t,  t,  a ]
+    ],
+    debug(puzzle, '>>> 15x15 #2 PUZZLE TEST PASSED <<<', []).
 
 :- end_tests(puzzle_solution).
