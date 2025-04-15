@@ -389,9 +389,11 @@ fill_puzzle(Puzzle, Slots, WordDict) :-
  * - Remove that selected slot from the list of slots (as it is now in-use).
  *********************************************************************/
 pick_most_constrained_slot(Puzzle, [Slot|Slots], WordDict, SelectedSlot, OtherSlots) :-
+    debug(puzzle, 'Evaluating slot: ~w', [Slot]),
     candidates_for_slot(Puzzle, Slot, WordDict, Candidates),
     length(Candidates, NumberOfCandidates),
-    pick_most_constrained_slot_aux(Puzzle, Slots, WordDict, Slot, NumberOfCandidates, SelectedSlot),
+    Slot = slot(_, SlotLength, _),
+    pick_most_constrained_slot_aux(Puzzle, Slots, WordDict, Slot, NumberOfCandidates, SlotLength, SelectedSlot),
     delete([Slot|Slots], SelectedSlot, OtherSlots).
 
 /*********************************************************************
@@ -413,13 +415,19 @@ pick_most_constrained_slot(Puzzle, [Slot|Slots], WordDict, SelectedSlot, OtherSl
  * Valid Case: If the current slot has fewer candidates than the best
  *      slot so far, update the best slot and continue searching.
  *********************************************************************/
-pick_most_constrained_slot_aux(_Puzzle, [], _WDict, Slot, _Count, Slot).
-pick_most_constrained_slot_aux(Puzzle, [CurrentSlot|Slots], WordDict, BestSlotSoFar, LowestCount, SelectedSlot) :-
+pick_most_constrained_slot_aux(_Puzzle, [], _WDict, Slot, _Count, _Length, Slot).
+pick_most_constrained_slot_aux(Puzzle, [CurrentSlot|Slots], WordDict, BestSlotSoFar, LowestCount, HighestSlotLength, SelectedSlot) :-
+    debug(puzzle, 'Evaluating in aux slot: ~w', [CurrentSlot]),
     candidates_for_slot(Puzzle, CurrentSlot, WordDict, CurrentCandidates),
     length(CurrentCandidates, CurrentCount),
+    CurrentSlot = slot(_, CurrentSlotLength, _),
     ( CurrentCount < LowestCount ->
-        pick_most_constrained_slot_aux(Puzzle, Slots, WordDict, CurrentSlot, CurrentCount, SelectedSlot)
-    ; pick_most_constrained_slot_aux(Puzzle, Slots, WordDict, BestSlotSoFar, LowestCount, SelectedSlot)
+        debug(puzzle, 'Found better slot: ~w with ~w candidates', [CurrentSlot, CurrentCount]),
+        pick_most_constrained_slot_aux(Puzzle, Slots, WordDict, CurrentSlot, CurrentCount, CurrentSlotLength, SelectedSlot)
+    ; CurrentCount == LowestCount, CurrentSlotLength > HighestSlotLength ->
+        debug(puzzle, 'Found equally constrained slot: ~w with ~w candidates', [CurrentSlot, CurrentCount]),
+        pick_most_constrained_slot_aux(Puzzle, Slots, WordDict, CurrentSlot, LowestCount, CurrentSlotLength, SelectedSlot)
+    ; pick_most_constrained_slot_aux(Puzzle, Slots, WordDict, BestSlotSoFar, LowestCount, HighestSlotLength, SelectedSlot)
     ).
 
 /*********************************************************************
@@ -1054,42 +1062,41 @@ test(fifteen_by_fifteen_2, true(Solutions = [ExpectedPuzzle])) :-
     ],
     debug(puzzle, '>>> 15x15 #2 PUZZLE TEST PASSED <<<', []).
 
-test(32_by_20, true(Solutions = [ExpectedPuzzle])) :-
+test(thirty_two_by_twenty, true(Sol == ExpectedPuzzle)) :-
     debug(puzzle, '>>> STARTING 32x20 PUZZLE TEST <<<', []),
     Puzzle = [
-                          %5                 %10                 %15                 %20
         [ _,  _,  _,  _,  _, '#', _,  _,  _,  _,  _,  _,  _, '#', _,  _,  _,  _, '#', _ ],
         [ _,  _,  _,  _,  _, '#', _,  _,  _,  _,  _, '#', _,  _, '#', _,  _,  _,  _,  _ ],
         [ _,  _,  _,  _, '#', _,  _,  _,  _, '#', _,  _,  _,  _,  _, '#', _,  _,  _,  _ ],
         [ _,  _,  _, '#', _,  _,  _,  _, '#', _,  _, '#', _,  _,  _,  _,  _,  _, '#', _ ],
-        [ _,  _, '#', _,  _,  _,  _,  _,  _,  _, '#', _,  _, '#', _,  _,  _,  _,  _,  _ ], %5
+        [ _,  _, '#', _,  _,  _,  _,  _,  _,  _, '#', _,  _, '#', _,  _,  _,  _,  _,  _ ],
         [ _,  _,  _,  _, '#', _,  _,  _, '#', _,  _,  _,  _,  _,  _, '#', _,  _,  _, '#'],
         [ _,  _,  _, '#', _,  _,  _, '#', _,  _,  _,  _, '#', _,  _,  _,  _, '#', _,  _ ],
         [ _, '#', _,  _,  _,  _, '#', _,  _,  _,  _,  _, '#', _,  _,  _,  _,  _,  _,  _ ],
         [ _, '#', _,  _, '#', _,  _,  _,  _,  _,  _, '#', _,  _,  _, '#', _,  _,  _,  _ ],
-        ['#', _,  _,  _,  _, '#', _,  _, '#', _,  _,  _, '#', _,  _,  _,  _,  _, '#', _ ], %10
+        ['#', _,  _,  _,  _, '#', _,  _, '#', _,  _,  _, '#', _,  _,  _,  _,  _, '#', _ ],
         [ _,  _,  _,  _,  _, '#', _,  _,  _, '#', _,  _,  _,  _,  _,  _, '#', _,  _,  _ ],
         [ _,  _,  _, '#', _,  _,  _,  _, '#', _,  _,  _, '#', _,  _,  _,  _,  _,  _,  _ ],
         [ _,  _, '#', _,  _,  _,  _, '#', _,  _,  _,  _,  _,  _,  _, '#', _,  _,  _,  _ ],
         [ _,  _,  _, '#', _,  _,  _, '#', _,  _,  _,  _,  _,  _,  _,  _,  _, '#', _,  _ ],
-        [ _,  _,  _,  _,  _,  _, '#', _,  _,  _,  _,  _, '#', _,  _,  _,  _,  _,  _, '#'], %15
+        [ _,  _,  _,  _,  _,  _, '#', _,  _,  _,  _,  _, '#', _,  _,  _,  _,  _,  _, '#'],
         [ _,  _, '#', _,  _,  _,  _,  _,  _,  _, '#', _,  _,  _,  _,  _, '#', _,  _,  _ ],
         [ _,  _,  _,  _,  _,  _,  _,  _,  _, '#', _,  _,  _,  _,  _,  _,  _, '#', _,  _ ],
         [ _,  _,  _,  _,  _, '#', _,  _,  _,  _,  _,  _, '#', _,  _,  _,  _,  _,  _,  _ ],
         [ _,  _,  _,  _,  _,  _,  _, '#', _,  _,  _,  _,  _,  _,  _,  _, '#', _,  _,  _ ],
-        [ _,  _,  _,  _, '#', _,  _,  _,  _,  _,  _,  _, '#', _,  _,  _,  _,  _,  _,  _ ], %20
+        [ _,  _,  _,  _, '#', _,  _,  _,  _,  _,  _,  _, '#', _,  _,  _,  _,  _,  _,  _ ],
         [ _,  _,  _,  _, '#', _,  _,  _,  _,  _, '#', _,  _,  _,  _,  _,  _, '#', _,  _ ],
         [ _,  _,  _, '#', _,  _,  _,  _,  _, '#', _,  _,  _,  _,  _,  _, '#', _,  _,  _ ],
         ['#', _,  _,  _,  _,  _,  _,  _,  _, '#', _,  _,  _,  _,  _,  _, '#', _,  _,  _ ],
         [ _,  _,  _,  _,  _,  _,  _,  _, '#', _,  _,  _,  _,  _,  _,  _,  _,  _,  _,  _ ],
-        [ _,  _,  _,  _,  _,  _,  _,  _,  _,  _,  _,  _,  _,  _,  _,  _,  _,  _,  _,  _ ], %25
+        [ _,  _,  _,  _,  _,  _,  _,  _,  _,  _,  _,  _,  _,  _,  _,  _,  _,  _,  _,  _ ],
         [ _,  _,  _,  _,  _,  _,  _,  _, '#', _,  _,  _,  _,  _,  _,  _,  _,  _, '#','#'],
         [ _,  _,  _,  _,  _, '#', _,  _,  _,  _,  _,  _,  _, '#', _,  _,  _,  _,  _,  _ ],
         [ _,  _,  _, '#', _,  _,  _,  _, '#', _,  _,  _,  _,  _,  _, '#', _,  _,  _,  _ ],
         ['#', _,  _,  _,  _,  _,  _,  _,  _, '#', _,  _,  _,  _,  _,  _,  _,  _, '#','#'],
-        [ _,  _,  _,  _,  _,  _,  _,  _,  _,  _,  _,  _,  _, '#', _,  _,  _,  _,  _,  _ ], %30
+        [ _,  _,  _,  _,  _,  _,  _,  _,  _,  _,  _,  _,  _, '#', _,  _,  _,  _,  _,  _ ],
         [ _,  _,  _,  _,  _, '#', _,  _,  _,  _,  _,  _,  _,  _, '#', _,  _,  _,  _,  _ ],
-        [ _,  _,  _, '#', _,  _,  _,  _,  _,  _,  _,  _,  _,  _, '#', _,  _,  _,  _,  _ ]  %32
+        [ _,  _,  _, '#', _,  _,  _,  _,  _,  _,  _,  _,  _,  _, '#', _,  _,  _,  _,  _ ]
     ],
     WordList = [
         % Horizontal
@@ -1105,6 +1112,9 @@ test(32_by_20, true(Solutions = [ExpectedPuzzle])) :-
         [u, m, m, m, m],
         [k, n, e, e],
         [r, a, t],
+        [h, e, l, p],
+        [m, e],
+        [i, n, s, t, a, g],
         [i, t],
         [d, e, s, t, r, o, y],
         [m, n],
@@ -1147,7 +1157,7 @@ test(32_by_20, true(Solutions = [ExpectedPuzzle])) :-
         [o, p],
         [l, o, v, e, l, y],
         [b, r, a, i, n],
-        [y, u, m, m, y],
+        [y, u, m, m, y, y],
         [i, n],
         [i, n, i, t, i, a, l],
         [d, r, i, v, e],
@@ -1191,6 +1201,9 @@ test(32_by_20, true(Solutions = [ExpectedPuzzle])) :-
         [u, m, b, r, e, l, l, a],
         [a, d, v, e, r, t, i, s, e, m, e, n, t],
         [s, k, i, p, p, a],
+        [h, u, m, a, n],
+        [r, e, s, o, u, r, c, e],
+        [c, o, m, p, a],
         [h, o, p],
         [u, n, i, v, e, r, s, i, t, y],
         [l, e, a, r, n],
@@ -1283,39 +1296,38 @@ test(32_by_20, true(Solutions = [ExpectedPuzzle])) :-
     findall(Sol, puzzle_solution(Sol, WordList), Solutions),
     maplist(print_puzzle, Solutions),
     ExpectedPuzzle = [
-                          %5                 %10                 %15                 %20
         [ t,  e,  e,  t,  h, '#', a,  m,  a,  z,  i,  n,  g, '#', h,  i,  g,  h, '#', w ],
         [ e,  s,  m,  o,  i, '#', g,  r,  e,  a,  t, '#', a,  m, '#', z,  e,  u,  u,  r ],
         [ r,  t,  o,  p, '#', c,  a,  r,  d, '#', u,  m,  m,  m,  m, '#', k,  n,  e,  e ],
         [ r,  a,  t, '#', h,  e,  l,  p, '#', m,  e, '#', i,  n,  s,  t,  a,  g, '#', c ],
-        [ i,  t, '#', d,  e,  s,  t,  r,  o,  y, '#', m,  n, '#', y,  e,  s,  r,  a,  k ], %5
+        [ i,  t, '#', d,  e,  s,  t,  r,  o,  y, '#', m,  n, '#', y,  e,  s,  r,  a,  k ],
         [ f,  i,  n,  t, '#', a,  n,  d, '#', s,  t,  e,  g,  e,  l, '#', y,  y,  y, '#'],
         [ i,  c,  u, '#', o,  m,  g, '#', t,  h,  e,  r, '#', e,  a,  r,  e, '#', s,  o ],
         [ e, '#', m,  a,  n,  y, '#', w,  o,  r,  d,  s, '#', w,  o,  n,  d,  e,  r,  i ],
         [ d, '#', i,  f, '#', p,  r,  o,  l,  o,  g, '#', c,  a,  n, '#', s,  o,  l,  v ],
-        ['#', t,  h,  i,  s, '#', o,  r, '#', n,  o,  t, '#', m,  i,  g,  h,  t, '#', b ], %10
+        ['#', t,  h,  i,  s, '#', o,  r, '#', n,  o,  t, '#', m,  i,  g,  h,  t, '#', b ],
         [ u,  h,  e,  r,  e, '#', f,  o,  r, '#', a,  w,  h,  i,  l,  e, '#', t,  i,  l ],
         [ n,  o,  o, '#', o,  p,  a,  l, '#', h,  e,  y, '#', m,  a,  c,  b,  o,  o,  k ],
         [ b,  e, '#', g,  o,  n,  e, '#', t,  r,  a,  i,  t,  o,  r, '#', f,  i,  l,  t ],
         [ e,  e,  l, '#', l,  l,  l, '#', d,  e,  l,  i,  r,  i,  o,  u,  s, '#', o,  p ],
-        [ l,  o,  v,  e,  l,  y, '#', b,  r,  a,  i,  n, '#', y,  u,  m,  m,  y,  y, '#'], %15
+        [ l,  o,  v,  e,  l,  y, '#', b,  r,  a,  i,  n, '#', y,  u,  m,  m,  y,  y, '#'],
         [ i,  n, '#', i,  n,  i,  t,  i,  a,  l, '#', d,  r,  i,  v,  e, '#', b,  l,  a ],
         [ e,  v,  o,  l,  u,  t,  i,  o,  n, '#', t,  o,  n,  i,  g,  h,  t, '#', b,  a ],
         [ v,  o,  l,  v,  o, '#', o,  n,  l,  i,  n,  e, '#', t,  a,  c,  t,  i,  c,  a ],
         [ a,  m,  b,  i,  e,  n,  t, '#', l,  i,  g,  h,  t,  i,  n,  g, '#', h,  o,  m ],
-        [ b,  e,  e,  s, '#', d,  i,  s,  p,  l,  a,  y, '#', l,  i,  g,  h,  t,  n,  i ], %20
-        [ l,  o,  v,  e, '#', d,  e,  a,  t,  h, '#', h,  a,  t,  r,  e,  d, '#', c,   o ],
+        [ b,  e,  e,  s, '#', d,  i,  s,  p,  l,  a,  y, '#', l,  i,  g,  h,  t,  n,  i ],
+        [ l,  o,  v,  e, '#', d,  e,  a,  t,  h, '#', h,  a,  t,  r,  e,  d, '#', c,  o ],
         [ e,  v,  o, '#', k,  a,  r,  m,  a, '#', r,  e,  g,  r,  e,  t, '#', s,  h,  a ],
         ['#', p,  o,  s,  i,  t,  i,  v,  e, '#', e,  n,  e,  r,  g,  y, '#', t,  r,  e ],
         [ h,  a,  r,  d,  l,  i,  n,  e, '#', b,  a,  t,  t,  l,  e,  f,  i,  e,  l,  d ],
-        [ a,  c,  c,  d,  e,  e,  i,  l,  o,  o,  p,  q,  r,  z,  w,  y,  a,  b,  b,  e ], %25
+        [ a,  c,  c,  d,  e,  e,  i,  l,  o,  o,  p,  q,  r,  z,  w,  y,  a,  b,  b,  e ],
         [ p,  l,  a,  t,  f,  o,  r,  m, '#', c,  o,  n,  n,  e,  c,  t,  o,  r, '#','#'],
         [ p,  r,  o,  o,  f, '#', c,  o,  n,  c,  e,  p,  t, '#', q,  u,  a,  l,  i,  t ],
         [ y,  u,  m, '#', t,  l,  d,  r, '#', a,  l,  m,  o,  s,  t, '#', f,  i,  n,  i ],
         ['#', t,  e,  l,  e,  p,  o,  r,  t, '#', u,  m,  b,  r,  e,  l,  l,  a, '#','#'],
-        [ a,  d,  v,  e,  r,  t,  i,  s,  e,  m,  e,  n,  t, '#', s,  k,  i,  p,  p,  a ], %30
+        [ a,  d,  v,  e,  r,  t,  i,  s,  e,  m,  e,  n,  t, '#', s,  k,  i,  p,  p,  a ],
         [ h,  u,  m,  a,  n, '#', r,  e,  s,  o,  u,  r,  c,  e, '#', c,  o,  m,  p,  a ],
-        [ h,  o,  p, '#', u,  n,  i,  v,  e,  r,  s,  i,  t,  y, '#', l,  e,  a,  r,  n ]  %32
+        [ h,  o,  p, '#', u,  n,  i,  v,  e,  r,  s,  i,  t,  y, '#', l,  e,  a,  r,  n ]
     ],
     debug(puzzle, '>>> 32x20 PUZZLE TEST PASSED <<<', []).
 
