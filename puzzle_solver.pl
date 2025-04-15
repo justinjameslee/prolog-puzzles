@@ -3,7 +3,7 @@
 :- use_module(library(plunit)).
 
 /*********************************************************************
- * Author:   Justin Lee <justinlee@student.unimelb.edu.au>
+ * Author:   Justin Lee <justinlee@student.unimelb.edu.au> <1599455>
  * Purpose:  Fill-in Puzzle Solver that given a crossword grid and a 
  *           word list, fills the grid with the words from the list.
  *
@@ -1055,6 +1055,7 @@ test(fifteen_by_fifteen_2, true(Solutions = [ExpectedPuzzle])) :-
     debug(puzzle, '>>> 15x15 #2 PUZZLE TEST PASSED <<<', []).
 
 test(32_by_20, true(Solutions = [ExpectedPuzzle])) :-
+    debug(puzzle, '>>> STARTING 32x20 PUZZLE TEST <<<', []),
     Puzzle = [
                           %5                 %10                 %15                 %20
         [ _,  _,  _,  _,  _, '#', _,  _,  _,  _,  _,  _,  _, '#', _,  _,  _,  _, '#', _ ],
@@ -1062,9 +1063,9 @@ test(32_by_20, true(Solutions = [ExpectedPuzzle])) :-
         [ _,  _,  _,  _, '#', _,  _,  _,  _, '#', _,  _,  _,  _,  _, '#', _,  _,  _,  _ ],
         [ _,  _,  _, '#', _,  _,  _,  _, '#', _,  _, '#', _,  _,  _,  _,  _,  _, '#', _ ],
         [ _,  _, '#', _,  _,  _,  _,  _,  _,  _, '#', _,  _, '#', _,  _,  _,  _,  _,  _ ], %5
-        [ _,  _,  _,  _, '#', _,  _,  _, '#', _,  _,  _,  _,  _,  _, '#', _,  _,  _, '#' ],
+        [ _,  _,  _,  _, '#', _,  _,  _, '#', _,  _,  _,  _,  _,  _, '#', _,  _,  _, '#'],
         [ _,  _,  _, '#', _,  _,  _, '#', _,  _,  _,  _, '#', _,  _,  _,  _, '#', _,  _ ],
-        [ _, '#'  _,  _,  _,  _, '#', _,  _,  _,  _,  _, '#', _,  _,  _,  _,  _,  _,  _ ],
+        [ _, '#', _,  _,  _,  _, '#', _,  _,  _,  _,  _, '#', _,  _,  _,  _,  _,  _,  _ ],
         [ _, '#', _,  _, '#', _,  _,  _,  _,  _,  _, '#', _,  _,  _, '#', _,  _,  _,  _ ],
         ['#', _,  _,  _,  _, '#', _,  _, '#', _,  _,  _, '#', _,  _,  _,  _,  _, '#', _ ], %10
         [ _,  _,  _,  _,  _, '#', _,  _,  _, '#', _,  _,  _,  _,  _,  _, '#', _,  _,  _ ],
@@ -1077,7 +1078,7 @@ test(32_by_20, true(Solutions = [ExpectedPuzzle])) :-
         [ _,  _,  _,  _,  _, '#', _,  _,  _,  _,  _,  _, '#', _,  _,  _,  _,  _,  _,  _ ],
         [ _,  _,  _,  _,  _,  _,  _, '#', _,  _,  _,  _,  _,  _,  _,  _, '#', _,  _,  _ ],
         [ _,  _,  _,  _, '#', _,  _,  _,  _,  _,  _,  _, '#', _,  _,  _,  _,  _,  _,  _ ], %20
-        [ _,  _,  _,  _, '#', _,  _,  _,  _,  _, '#', _,  _,  _,  _,  _,  _, '#', _   _ ],
+        [ _,  _,  _,  _, '#', _,  _,  _,  _,  _, '#', _,  _,  _,  _,  _,  _, '#', _,  _ ],
         [ _,  _,  _, '#', _,  _,  _,  _,  _, '#', _,  _,  _,  _,  _,  _, '#', _,  _,  _ ],
         ['#', _,  _,  _,  _,  _,  _,  _,  _, '#', _,  _,  _,  _,  _,  _, '#', _,  _,  _ ],
         [ _,  _,  _,  _,  _,  _,  _,  _, '#', _,  _,  _,  _,  _,  _,  _,  _,  _,  _,  _ ],
@@ -1088,7 +1089,7 @@ test(32_by_20, true(Solutions = [ExpectedPuzzle])) :-
         ['#', _,  _,  _,  _,  _,  _,  _,  _, '#', _,  _,  _,  _,  _,  _,  _,  _, '#','#'],
         [ _,  _,  _,  _,  _,  _,  _,  _,  _,  _,  _,  _,  _, '#', _,  _,  _,  _,  _,  _ ], %30
         [ _,  _,  _,  _,  _, '#', _,  _,  _,  _,  _,  _,  _,  _, '#', _,  _,  _,  _,  _ ],
-        [ _,  _,  _, '#', _,  _,  _,  _,  _,  _,  _,  _,  _,  _, '#', _,  _,  _,  _,  _ ], %32
+        [ _,  _,  _, '#', _,  _,  _,  _,  _,  _,  _,  _,  _,  _, '#', _,  _,  _,  _,  _ ]  %32
     ],
     WordList = [
         % Horizontal
@@ -1125,11 +1126,11 @@ test(32_by_20, true(Solutions = [ExpectedPuzzle])) :-
         [c, a, n],
         [s, o, l, v],
         [t, h, i, s],
-        [o, r].
+        [o, r],
         [n, o, t],
         [m, i, g, h, t],
         [u, h, e, r, e],
-        [f, o, r]
+        [f, o, r],
         [a, w, h, i, l, e],
         [t, i, l],
         [n, o, o],
@@ -1190,10 +1191,97 @@ test(32_by_20, true(Solutions = [ExpectedPuzzle])) :-
         [u, m, b, r, e, l, l, a],
         [a, d, v, e, r, t, i, s, e, m, e, n, t],
         [s, k, i, p, p, a],
-        [h, o, p,],
+        [h, o, p],
         [u, n, i, v, e, r, s, i, t, y],
-        [l, e, a, r, n]
-    ]
+        [l, e, a, r, n],
+        % Vertical
+        [t, e, r, r, i, f, i, e, d],
+        [u, n, b, e, l, i, e, v, a, b, l, e],
+        [h, a, p, p, y],
+        [a, h, h],
+        [e, s, t, a, t, i, c],
+        [t, h, o, e, e, o, n, v, o, m, e, o, v, p, a, c, l, r, u, t, d, u, o],
+        [e, m, o, t],
+        [n, u, m, i, h, e, o],
+        [l, v],
+        [o, l, b, e, v, o, o, r, c, a, o, m, e, v, m, p],
+        [t, o, p],
+        [d, t],
+        [a, f, i, r],
+        [e, i, l, v, i, s, e],
+        [s, d, d, t, o],
+        [l, e, a],
+        [h, i],
+        [h, e],
+        [o, n],
+        [s, e, o, o, l, l, n, u, o, e],
+        [k, i, l, e, f, f, t, e, r, n, u],
+        [c, e, s, a, m, y, p],
+        [p, n, l, y, i, t],
+        [n, d, d, a, t, i, e, o],
+        [l, p, t],
+        [a, g, a, l, t, n, g],
+        [r, o, f, a, e, l],
+        [t, i, o, t, i, e, r, i, n, i, r, c, d, o, i, r, i],
+        [m, r, r, p, r, d],
+        [w, o, r, o, l],
+        [b, i, o, n],
+        [s, a, m, v, e, l, m, o, r, r, s, e, v],
+        [a, e, d],
+        [t, o, l],
+        [t, d, r, a, n, l, l, p, t, a, e],
+        [t, e, s, e],
+        [z, a],
+        [m, y, s, h, r, o, n],
+        [h, r, e, a, l],
+        [i, i, l, h],
+        [b, o, c, c, a],
+        [m, o, r],
+        [i, t, u, e],
+        [t, e, d, g, o, a, e, a, l, i],
+        [t, n, g, a],
+        [r, e, a, p, o, e, l, u, e, u, s],
+        [m, e, r, s],
+        [t, w, y, i, i, n, d, o, e, h, y, h, e, n, t, q, n, p, m, m, n, r, i],
+        [g, a, m, i, n, g],
+        [t, r],
+        [r, n],
+        [a, g, e, t, r, n, t, o, b, t, c, t],
+        [m, m, n],
+        [e, e, w, a, m, i, m, o, i, y, i, i, t, i, l, t, r, r, l, z, e],
+        [s, r],
+        [e, y],
+        [m, s, y, l, a, o, n, i, l, a, r, o, u, v, g, a, n, i, r, e, g, e, w, c, q, t, e, s],
+        [i, z],
+        [t, e],
+        [r, n],
+        [g, e, c],
+        [u, m, e, h, c, g, g, e, t, y, f, y, t, u],
+        [l, k, c, l],
+        [g, e, k, a, s, y, e, d, s, h],
+        [b, f, s, m],
+        [t, t],
+        [h, d],
+        [i, a, o, a, f, l, i, o, e],
+        [h, u, n, g, r, y],
+        [e, o, t, t, o, i],
+        [y, b],
+        [i, h, t],
+        [s, t, e, b, r, l, i, a, p, m, a],
+        [u, e],
+        [a, y, s, r, l],
+        [i, o, l, o, y, l, b, c, o, n, c, h, r, l, b],
+        [i, n],
+        [p, p, r],
+        [w, r, e, c, k],
+        [o, i, v, b, l, k, t, p],
+        [a, a, a, m, i, o, a, e, d, e],
+        [t, i],
+        [a, a, n]
+    ],
+    copy_term(Puzzle, Sol),
+    findall(Sol, puzzle_solution(Sol, WordList), Solutions),
+    maplist(print_puzzle, Solutions),
     ExpectedPuzzle = [
                           %5                 %10                 %15                 %20
         [ t,  e,  e,  t,  h, '#', a,  m,  a,  z,  i,  n,  g, '#', h,  i,  g,  h, '#', w ],
@@ -1203,7 +1291,7 @@ test(32_by_20, true(Solutions = [ExpectedPuzzle])) :-
         [ i,  t, '#', d,  e,  s,  t,  r,  o,  y, '#', m,  n, '#', y,  e,  s,  r,  a,  k ], %5
         [ f,  i,  n,  t, '#', a,  n,  d, '#', s,  t,  e,  g,  e,  l, '#', y,  y,  y, '#'],
         [ i,  c,  u, '#', o,  m,  g, '#', t,  h,  e,  r, '#', e,  a,  r,  e, '#', s,  o ],
-        [ e, '#'  m,  a,  n,  y, '#', w,  o,  r,  d,  s, '#', w,  o,  n,  d,  e,  r,  i ],
+        [ e, '#', m,  a,  n,  y, '#', w,  o,  r,  d,  s, '#', w,  o,  n,  d,  e,  r,  i ],
         [ d, '#', i,  f, '#', p,  r,  o,  l,  o,  g, '#', c,  a,  n, '#', s,  o,  l,  v ],
         ['#', t,  h,  i,  s, '#', o,  r, '#', n,  o,  t, '#', m,  i,  g,  h,  t, '#', b ], %10
         [ u,  h,  e,  r,  e, '#', f,  o,  r, '#', a,  w,  h,  i,  l,  e, '#', t,  i,  l ],
@@ -1216,7 +1304,7 @@ test(32_by_20, true(Solutions = [ExpectedPuzzle])) :-
         [ v,  o,  l,  v,  o, '#', o,  n,  l,  i,  n,  e, '#', t,  a,  c,  t,  i,  c,  a ],
         [ a,  m,  b,  i,  e,  n,  t, '#', l,  i,  g,  h,  t,  i,  n,  g, '#', h,  o,  m ],
         [ b,  e,  e,  s, '#', d,  i,  s,  p,  l,  a,  y, '#', l,  i,  g,  h,  t,  n,  i ], %20
-        [ l,  o,  v,  e, '#', d,  e,  a,  t,  h, '#', h,  a,  t,  r,  e,  d, '#', c   o ],
+        [ l,  o,  v,  e, '#', d,  e,  a,  t,  h, '#', h,  a,  t,  r,  e,  d, '#', c,   o ],
         [ e,  v,  o, '#', k,  a,  r,  m,  a, '#', r,  e,  g,  r,  e,  t, '#', s,  h,  a ],
         ['#', p,  o,  s,  i,  t,  i,  v,  e, '#', e,  n,  e,  r,  g,  y, '#', t,  r,  e ],
         [ h,  a,  r,  d,  l,  i,  n,  e, '#', b,  a,  t,  t,  l,  e,  f,  i,  e,  l,  d ],
@@ -1227,8 +1315,8 @@ test(32_by_20, true(Solutions = [ExpectedPuzzle])) :-
         ['#', t,  e,  l,  e,  p,  o,  r,  t, '#', u,  m,  b,  r,  e,  l,  l,  a, '#','#'],
         [ a,  d,  v,  e,  r,  t,  i,  s,  e,  m,  e,  n,  t, '#', s,  k,  i,  p,  p,  a ], %30
         [ h,  u,  m,  a,  n, '#', r,  e,  s,  o,  u,  r,  c,  e, '#', c,  o,  m,  p,  a ],
-        [ h,  o,  p, '#', u,  n,  i,  v,  e,  r,  s,  i,  t,  y, '#', l,  e,  a,  r,  n ], %32
+        [ h,  o,  p, '#', u,  n,  i,  v,  e,  r,  s,  i,  t,  y, '#', l,  e,  a,  r,  n ]  %32
     ],
-
+    debug(puzzle, '>>> 32x20 PUZZLE TEST PASSED <<<', []).
 
 :- end_tests(puzzle_solution).
