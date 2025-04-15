@@ -788,9 +788,9 @@ test(more_words_than_slots, true(Solutions = [])) :-
     findall(Sol, puzzle_solution(Sol, WordList), Solutions),
     debug(puzzle, '>>> MORE WORDS THAN SLOTS TEST FAILED <<<', []).
 
-/* Test Case 6: Most constrained slot challenge */
+/* Test Case 6: No blocked cells */
 test(most_constrained_slot, true(Solutions = [ExpectedPuzzle])) :-
-    debug(puzzle, '>>> STARTING MOST CONSTRAINED SLOT TEST <<<', []),
+    debug(puzzle, '>>> STARTING NO BLOCKED CELLS TEST <<<', []),
     Puzzle = [
         [ _,  _,  r,  _ ],
         [ _,  _,  a,  _ ],
@@ -816,7 +816,7 @@ test(most_constrained_slot, true(Solutions = [ExpectedPuzzle])) :-
         [ h,  a,  t,  e ],
         [ c,  k,  e,  e ]
     ],
-    debug(puzzle, '>>> MOST CONSTRAINED SLOT TEST PASSED <<<', []).
+    debug(puzzle, '>>> MOST NO BLOCKED CELLS TEST PASSED <<<', []).
 
 /* Test Case 7: 10x10 sized puzzle */
 test(ten_by_ten, true(Solutions = [ExpectedPuzzle])) :-
@@ -1067,6 +1067,7 @@ test(fifteen_by_fifteen_2, true(Solutions = [ExpectedPuzzle])) :-
     ],
     debug(puzzle, '>>> 15x15 #2 PUZZLE TEST PASSED <<<', []).
 
+/* Test Case 10: 32x20 sized puzzle */
 test(thirty_two_by_twenty, true(Solutions == [ExpectedPuzzle])) :-
     debug(puzzle, '>>> STARTING 32x20 PUZZLE TEST <<<', []),
     Puzzle = [
